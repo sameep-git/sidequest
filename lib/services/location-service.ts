@@ -102,11 +102,11 @@ class LocationService {
             const isDefined = await TaskManager.isTaskDefined(GEOFENCE_TASK_NAME);
             if (!isDefined) {
                 // Task might be defined below but runtime check is good
-                console.log('Task definition check passed');
+
             }
 
             await Location.startGeofencingAsync(GEOFENCE_TASK_NAME, regions);
-            console.log(`Started geofencing ${regions.length} stores`);
+
         } catch (e) {
             console.error('Error starting geofencing:', e);
         }
@@ -123,7 +123,7 @@ TaskManager.defineTask(GEOFENCE_TASK_NAME, async ({ data, error }: any) => {
     }
     if (data?.eventType === Location.GeofencingEventType.Enter) {
         const { region } = data;
-        console.log('You entered a region:', region);
+
 
         await Notifications.scheduleNotificationAsync({
             content: {

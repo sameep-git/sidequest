@@ -1,3 +1,4 @@
+import { ShoppingListItem } from '@/components/sidequest/shop/shopping-list-item';
 import { Button } from '@/components/ui/button';
 import { useSupabaseUser } from '@/hooks/use-supabase-user';
 import { useHouseholdStore } from '@/lib/household-store';
@@ -5,18 +6,18 @@ import { shoppingService } from '@/lib/services';
 import type { ShoppingItem } from '@/lib/types';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Plus, Trash2, X } from 'lucide-react-native';
+import { Plus, X } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   Text,
   TextInput,
-  View,
+  View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -136,61 +137,26 @@ export function ShopTab() {
           <ActivityIndicator color="#0F8" />
         </View>
       ) : (
-        <ScrollView
+        <FlatList
           className="flex-1"
           contentContainerClassName="px-6 pt-4"
           contentContainerStyle={{
             paddingBottom: primaryCtaHeight + insets.bottom + tabBarClearance + 16,
           }}
           showsVerticalScrollIndicator={false}
-        >
-          <View className="gap-3">
-            {items
-              .sort((a, b) => {
-                if (a.status === b.status) return 0;
-                return a.status === 'pending' ? -1 : 1;
-              })
-              .map((item) => (
-                <View
-                  key={item.id}
-                  className="rounded-2xl border px-4 py-4"
-                  style={{ backgroundColor: '#2a2a2a', borderColor: '#333' }}
-                >
-                  <View className="flex-row items-center">
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={item.status === 'pending' ? 'Mark complete' : 'Mark pending'}
-                      onPress={() => handleToggleComplete(item)}
-                      className="mr-3 h-6 w-6 items-center justify-center rounded-full border-2"
-                      style={{ borderColor: '#333' }}
-                    >
-                      {item.status === 'purchased' && (
-                        <View className="h-3 w-3 rounded-full" style={{ backgroundColor: '#0F8' }} />
-                      )}
-                    </Pressable>
-
-                    <View className="flex-1">
-                      <Text className={item.status === 'purchased' ? 'text-white/50 line-through' : 'text-white'}>
-                        {item.name}
-                      </Text>
-                      <Text className="mt-1 text-xs" style={{ color: '#888' }}>
-                        {item.bounty_amount ? `Bounty +$${item.bounty_amount.toFixed(2)}` : 'No bounty'}
-                      </Text>
-                    </View>
-
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => handleDelete(item.id)}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                      <Trash2 size={18} color="#ff7f7f" />
-                    </Pressable>
-                  </View>
-                </View>
-              ))}
-          </View>
-
-          {!items.length && (
+          data={items.sort((a, b) => {
+            if (a.status === b.status) return 0;
+            return a.status === 'pending' ? -1 : 1;
+          })}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }: { item: ShoppingItem }) => (
+            <ShoppingListItem
+              item={item}
+              onToggleComplete={handleToggleComplete}
+              onDelete={handleDelete}
+            />
+          )}
+          ListEmptyComponent={
             <View className="items-center py-12">
               <Text className="text-5xl">🎉</Text>
               <Text className="mt-3 text-xl font-semibold text-white">Nothing to buy</Text>
@@ -198,8 +164,8 @@ export function ShopTab() {
                 Add items to get started
               </Text>
             </View>
-          )}
-        </ScrollView>
+          }
+        />
       )}
 
       <View

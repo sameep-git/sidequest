@@ -48,4 +48,8 @@ app-example
 /android
 
 # agent files
-.agent
+.agent/
+.agents/
+.expo/
+.gemini/
+.opencode/

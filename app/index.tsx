@@ -90,7 +90,7 @@ export default function IndexScreen() {
     return (
       <EmailAuth
         onSuccess={() => {
-          console.log('✅ Email auth success! Resetting to check household...');
+
           setPhase('loading');
           setHasCheckedHousehold(false);
         }}
