@@ -1,28 +1,48 @@
+import { useSupabaseUser } from '@/hooks/use-supabase-user';
+import { householdService } from '@/lib/services';
 import { Home, Plus } from 'lucide-react-native';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type HouseholdGateProps = {
-  onContinue: (houseName: string) => void;
+  onContinue: (householdId: string, houseName: string, joinCode: string | null) => void;
 };
 
 type Mode = 'choose' | 'join' | 'create';
 
 export function HouseholdGate({ onContinue }: HouseholdGateProps) {
+  const { user } = useSupabaseUser();
   const [mode, setMode] = useState<Mode>('choose');
   const [houseCode, setHouseCode] = useState('');
   const [houseName, setHouseName] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleJoin = () => {
-    if (houseCode.length === 6) {
-      onContinue('The Trap House');
+  const handleJoin = async () => {
+    if (!user || houseCode.length !== 6) return;
+
+    setIsLoading(true);
+    try {
+      const { household } = await householdService.joinByCode(houseCode, user.id);
+      onContinue(household.id, household.name, household.join_code);
+    } catch (err) {
+      Alert.alert('Failed to join', err instanceof Error ? err.message : 'Invalid code');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleCreate = () => {
-    if (houseName.trim()) {
-      onContinue(houseName.trim());
+  const handleCreate = async () => {
+    if (!user || !houseName.trim()) return;
+
+    setIsLoading(true);
+    try {
+      const { household } = await householdService.create(houseName.trim(), user.id);
+      onContinue(household.id, household.name, household.join_code);
+    } catch (err) {
+      Alert.alert('Failed to create', err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -103,12 +123,16 @@ export function HouseholdGate({ onContinue }: HouseholdGateProps) {
       />
       <Pressable
         onPress={mode === 'join' ? handleJoin : handleCreate}
-        disabled={mode === 'join' ? houseCode.length !== 6 : !houseName.trim()}
+        disabled={isLoading || (mode === 'join' ? houseCode.length !== 6 : !houseName.trim())}
         className="mt-6 rounded-2xl bg-[#0F8] px-6 py-4 disabled:opacity-60"
       >
-        <Text className="text-center text-lg font-semibold text-black">
-          {mode === 'join' ? 'Join House' : 'Create House'}
-        </Text>
+        {isLoading ? (
+          <ActivityIndicator color="#000" />
+        ) : (
+          <Text className="text-center text-lg font-semibold text-black">
+            {mode === 'join' ? 'Join House' : 'Create House'}
+          </Text>
+        )}
       </Pressable>
     </View>
     </SafeAreaView>

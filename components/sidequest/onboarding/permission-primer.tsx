@@ -1,5 +1,9 @@
+import { openAppSettings } from '@/lib/permissions';
+import { Camera as CameraModule } from 'expo-camera';
+import * as Location from 'expo-location';
 import { Camera, MapPin } from 'lucide-react-native';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type PermissionPrimerProps = {
@@ -7,6 +11,43 @@ type PermissionPrimerProps = {
 };
 
 export function PermissionPrimer({ onContinue }: PermissionPrimerProps) {
+  const [isRequesting, setIsRequesting] = useState(false);
+  
+
+  const handleEnablePermissions = async () => {
+    setIsRequesting(true);
+    try {
+      // Request foreground location and camera permissions
+      const foregroundStatus = await Location.requestForegroundPermissionsAsync();
+      const cameraStatus = await CameraModule.requestCameraPermissionsAsync();
+
+      // Read back final states
+      const fg = await Location.getForegroundPermissionsAsync();
+      const cam = await CameraModule.getCameraPermissionsAsync();
+
+      const locationGranted = fg.status === 'granted';
+      const cameraGranted = cam.status === 'granted';
+
+      if (locationGranted && cameraGranted) {
+        onContinue();
+        return;
+      }
+
+      // Keep the user on the screen and let them open Settings. Don't spam alerts.
+    } catch (error) {
+      console.error('Permission error:', error);
+      Alert.alert(
+        'Permission Error',
+        'An error occurred while requesting permissions. Please try again.',
+        [
+          { text: 'Try Again', onPress: handleEnablePermissions }
+        ]
+      );
+    } finally {
+      setIsRequesting(false);
+    }
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-[#111]" edges={['top', 'bottom']}>
       <View className="flex-1 px-6 py-6">
@@ -48,12 +89,25 @@ export function PermissionPrimer({ onContinue }: PermissionPrimerProps) {
         </View>
       </ScrollView>
 
-      <View className="mt-4 gap-3">
-        <Pressable onPress={onContinue} className="rounded-2xl bg-[#0F8] px-5 py-4">
-          <Text className="text-center text-base font-semibold text-black">Enable Permissions</Text>
+      <View className="mt-4">
+        <Pressable 
+          onPress={handleEnablePermissions} 
+          className="rounded-2xl bg-[#0F8] px-5 py-4"
+          disabled={isRequesting}
+        >
+          <Text className="text-center text-base font-semibold text-black">
+            {isRequesting ? 'Requesting...' : 'Enable Permissions'}
+          </Text>
         </Pressable>
-        <Pressable onPress={onContinue} className="rounded-2xl border border-[#333] px-5 py-4">
-          <Text className="text-center text-base font-semibold text-gray-400">Skip for Now</Text>
+
+        {/* Status removed: kept UI minimal to avoid exposing debug state to users */}
+
+        <Pressable
+          onPress={openAppSettings}
+          className="mt-4 rounded-2xl border border-[#333] px-5 py-4"
+          disabled={isRequesting}
+        >
+          <Text className="text-center text-base font-semibold text-white">Open Settings</Text>
         </Pressable>
       </View>
       </View>

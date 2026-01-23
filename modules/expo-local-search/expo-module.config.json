@@ -1,0 +1,11 @@
+{
+    "name": "expo-local-search",
+    "platforms": [
+        "ios"
+    ],
+    "ios": {
+        "modules": [
+            "ExpoLocalSearchModule"
+        ]
+    }
+}

@@ -1,7 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Tabs } from 'expo-router';
 import { Icon, Label, NativeTabs, VectorIcon } from 'expo-router/unstable-native-tabs';
-import { Camera, Home, ShoppingCart, User } from 'lucide-react-native';
+import { Home, Plus, ShoppingCart, User } from 'lucide-react-native';
 import React from 'react';
 import { DynamicColorIOS, Platform } from 'react-native';
 
@@ -39,8 +39,8 @@ export default function TabLayout() {
         <Tabs.Screen
           name="scan"
           options={{
-            title: 'Scan',
-            tabBarIcon: ({ color, size }) => <Camera color={color} size={size ?? 24} />,
+            title: 'Add',
+            tabBarIcon: ({ color, size }) => <Plus color={color} size={size ?? 24} />,
           }}
         />
         <Tabs.Screen
@@ -86,10 +86,10 @@ export default function TabLayout() {
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="scan">
-        <Label>Scan</Label>
+        <Label>Add</Label>
         {Platform.select({
-          ios: <Icon sf={{ default: 'camera', selected: 'camera.fill' }} />,
-          android: <Icon src={<VectorIcon family={MaterialIcons} name="document-scanner" />} />,
+          ios: <Icon sf={{ default: 'plus.circle', selected: 'plus.circle.fill' }} />,
+          android: <Icon src={<VectorIcon family={MaterialIcons} name="add-circle-outline" />} />,
         })}
       </NativeTabs.Trigger>
 

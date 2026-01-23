@@ -1,12 +1,29 @@
+import { authService } from '@/lib/auth';
 import { Apple, Mail } from 'lucide-react-native';
-import { Image, Pressable, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, Image, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type LandingProps = {
   onContinue: () => void;
+  onEmailAuth: () => void;
 };
 
-export function Landing({ onContinue }: LandingProps) {
+export function Landing({ onContinue, onEmailAuth }: LandingProps) {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleAppleSignIn = async () => {
+    try {
+      setIsLoading(true);
+      await authService.signInWithApple();
+      onContinue();
+    } catch (error: any) {
+      console.error('Apple Sign In error:', error);
+      Alert.alert('Sign In Failed', error.message || 'Could not sign in with Apple');
+    } finally {
+      setIsLoading(false);
+    }
+  };
   return (
     <SafeAreaView className="flex-1 bg-[#111]" edges={['top', 'bottom']}>
       <View className="flex-1 justify-between px-6 pb-10 pt-6">
@@ -25,16 +42,24 @@ export function Landing({ onContinue }: LandingProps) {
 
         <View className="gap-4">
           <Pressable
-            onPress={onContinue}
+            onPress={handleAppleSignIn}
+            disabled={isLoading}
             className="flex-row items-center justify-center rounded-2xl border border-[#1f1f1f] bg-black px-4 py-4"
           >
-            <View className="mr-3">
-              <Apple size={18} color="#fff" />
-            </View>
-            <Text className="text-base font-semibold text-white">Sign in with Apple</Text>
+            {isLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <View className="mr-3">
+                  <Apple size={18} color="#fff" />
+                </View>
+                <Text className="text-base font-semibold text-white">Sign in with Apple</Text>
+              </>
+            )}
           </Pressable>
           <Pressable
-            onPress={onContinue}
+            onPress={onEmailAuth}
+            disabled={isLoading}
             className="flex-row items-center justify-center rounded-2xl border border-[#333] bg-[#1d1d1d] px-4 py-4"
           >
             <View className="mr-3">
