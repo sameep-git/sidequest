@@ -1,16 +1,18 @@
 import { CameraView } from '@/components/sidequest/scan/camera-view';
 import { ItemEditorView } from '@/components/sidequest/scan/item-editor-view';
 import { SummaryView } from '@/components/sidequest/scan/summary-view';
+import { useNetworkStatus } from '@/hooks/use-network-status';
 import { useSupabaseUser } from '@/hooks/use-supabase-user';
 import { useHouseholdStore } from '@/lib/household-store';
 import { debtService, shoppingService, transactionService } from '@/lib/services';
 import type { ShoppingItem } from '@/lib/types';
 import { buildReceiptFromLines, type ReceiptItem } from '@/lib/utils/receipt-parser';
-import { CameraType, CameraView as ExpoCameraView } from 'expo-camera';
+import { CameraView as ExpoCameraView } from 'expo-camera';
 import { useFocusEffect } from 'expo-router';
+import { WifiOff } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Alert, Platform, Text, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import TextRecognition from 'react-native-text-recognition';
 
 type Roommate = {
@@ -28,8 +30,9 @@ export function ScanTab() {
   const iosMajorVersion = Platform.OS === 'ios' ? Number.parseInt(String(Platform.Version), 10) : null;
   const tabBarClearance = Platform.OS !== 'ios' || (iosMajorVersion != null && iosMajorVersion >= 26) ? 88 : 0;
 
+  const { isOffline } = useNetworkStatus();
+
   const [scanState, setScanState] = useState<ScanState>('itemizing');
-  const [cameraType] = useState<CameraType>('back');
   const cameraRef = useRef<ExpoCameraView | null>(null);
 
   const [receiptItems, setReceiptItems] = useState<ReceiptItem[]>([]);
@@ -37,24 +40,26 @@ export function ScanTab() {
   const [splitSelection, setSplitSelection] = useState<Set<string>>(new Set());
   const [isPosting, setIsPosting] = useState(false);
   const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
-  const [bountyMatches, setBountyMatches] = useState<Array<{
+  const [bountyMatches, setBountyMatches] = useState<{
     receiptItem: ReceiptItem;
     shoppingItem: ShoppingItem;
     confirmed: boolean | null;
-  }>>([]);
+  }[]>([]);
   const [addedShoppingItemIds, setAddedShoppingItemIds] = useState<Set<string>>(new Set());
-  const [pendingShoppingMatches, setPendingShoppingMatches] = useState<Array<{
+  const [pendingShoppingMatches, setPendingShoppingMatches] = useState<{
     receiptItem: ReceiptItem;
     shoppingItem: ShoppingItem;
     isExact: boolean;
     confirmed: boolean;
-  }>>([]);
+  }[]>([]);
   const [showMatchConfirmation, setShowMatchConfirmation] = useState(false);
-  const timeoutsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
+  const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const householdId = useHouseholdStore((state) => state.householdId);
   const members = useHouseholdStore((state) => state.members);
   const { user } = useSupabaseUser();
+
+
 
   const roommates = useMemo<Roommate[]>(() => {
     const palette = ['#0F8', '#8b5cf6', '#3b82f6', '#f97316', '#ec4899'];
@@ -528,6 +533,20 @@ export function ScanTab() {
 
         if (bountyDebts.length) {
           await debtService.createMany(bountyDebts);
+
+          // 3. Notify requesters that their bounty was claimed
+          import('@/lib/services/push-service').then(({ pushService }) => {
+            matchesToProcess.forEach(m => {
+              if (m.shoppingItem.requested_by && m.shoppingItem.bounty_amount) {
+                pushService.notifyBountyClaimed(
+                  m.shoppingItem.requested_by,
+                  user.user_metadata?.display_name || 'Roommate',
+                  m.shoppingItem.name,
+                  m.shoppingItem.bounty_amount
+                );
+              }
+            });
+          });
         }
       }
 
@@ -586,6 +605,26 @@ export function ScanTab() {
       );
     }
   };
+
+  // Show offline message when trying to scan
+  if (isOffline && (scanState === 'idle' || scanState === 'itemizing')) {
+    return (
+      <SafeAreaView edges={['top']} className="flex-1 items-center justify-center" style={{ backgroundColor: '#222' }}>
+        <View className="items-center px-6">
+          <View
+            className="h-20 w-20 items-center justify-center rounded-full mb-4"
+            style={{ backgroundColor: 'rgba(249, 115, 22, 0.15)' }}
+          >
+            <WifiOff size={36} color="#f97316" />
+          </View>
+          <Text className="text-xl font-semibold text-white mb-2">You&apos;re Offline</Text>
+          <Text className="text-sm text-center text-[#888]">
+            Receipt scanning requires an internet connection. You can still view and manage your shopping list while offline.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (scanState === 'idle' || scanState === 'processing') {
     return (

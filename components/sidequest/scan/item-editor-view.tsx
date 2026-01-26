@@ -17,11 +17,11 @@ type ItemEditorViewProps = {
     totalAmount: number;
     receiptItems: ReceiptItem[];
     selectedItem: string | null;
-    bountyMatches: Array<{
+    bountyMatches: {
         receiptItem: ReceiptItem;
         shoppingItem: ShoppingItem;
         confirmed: boolean | null;
-    }>;
+    }[];
     pendingShoppingItems: ShoppingItem[];
     isPosting: boolean;
     splitSelection: Set<string>;
@@ -32,12 +32,12 @@ type ItemEditorViewProps = {
 
     // State for Confirmation Modal
     showMatchConfirmation: boolean;
-    pendingShoppingMatches: Array<{
+    pendingShoppingMatches: {
         receiptItem: ReceiptItem;
         shoppingItem: ShoppingItem;
         isExact: boolean;
         confirmed: boolean;
-    }>;
+    }[];
 
     // Actions
     onScanNew: () => void;
@@ -144,7 +144,7 @@ export function ItemEditorView({
                                             <View className="flex-row justify-between items-start mb-3">
                                                 <View className="flex-1 mr-2">
                                                     <Text className="text-white font-semibold">{match.shoppingItem.name}</Text>
-                                                    <Text className="text-xs text-white/60"> matched "{match.receiptItem.name}"</Text>
+                                                    <Text className="text-xs text-white/60"> matched &quot;{match.receiptItem.name}&quot;</Text>
                                                 </View>
                                                 {match.shoppingItem.bounty_amount && (
                                                     <View className="bg-[#f59e0b] px-2 py-1 rounded-lg">
@@ -262,8 +262,7 @@ export function ItemEditorView({
                                     accessibilityRole="button"
                                     accessibilityLabel="Delete item"
                                     onPress={() => onDelete(item.id)}
-                                    className="p-2 ml-1"
-                                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                    className="p-3 ml-1"
                                 >
                                     <Trash2 size={18} color="#ef4444" />
                                 </Pressable>
@@ -422,7 +421,7 @@ export function ItemEditorView({
                                     <View className="flex-1">
                                         <Text className="text-white font-semibold">{match.receiptItem.name}</Text>
                                         <Text className="text-white/60 text-sm">
-                                            {match.isExact ? 'Exact match: ' : 'Possible match: '}"{match.shoppingItem.name}"
+                                            {match.isExact ? 'Exact match: ' : 'Possible match: '}&quot;{match.shoppingItem.name}&quot;
                                         </Text>
                                         {match.shoppingItem.bounty_amount ? (
                                             <Text className="text-[#f59e0b] font-bold text-sm mt-1">

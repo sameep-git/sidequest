@@ -28,7 +28,7 @@ class LocationService {
         if (fgStatus !== 'granted') {
             Alert.alert(
                 'Location Required',
-                'Sidequest needs your location to find nearby grocery stores.',
+                'sidequest needs your location to find nearby grocery stores.',
                 [{ text: 'Open Settings', onPress: () => Linking.openSettings() }]
             );
             return false;
@@ -124,12 +124,15 @@ TaskManager.defineTask(GEOFENCE_TASK_NAME, async ({ data, error }: any) => {
     if (data?.eventType === Location.GeofencingEventType.Enter) {
         const { region } = data;
 
-
         await Notifications.scheduleNotificationAsync({
             content: {
-                title: "You're near a grocery store!",
-                body: `Don't forget to check the shopping list at ${region.identifier}`,
-                data: { url: '/shop' }, // Deep link to shop tab
+                title: "🛒 You're at a grocery store!",
+                body: `Check the shopping list - you're near ${region.identifier}`,
+                data: { type: 'geofence', url: '/(tabs)/shop' },
+                sound: 'default',
+                sticky: true, // Persistent notification
+                autoDismiss: false,
+                priority: Notifications.AndroidNotificationPriority.HIGH,
             },
             trigger: null, // Send immediately
         });

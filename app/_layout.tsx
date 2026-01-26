@@ -1,5 +1,7 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import * as Sentry from '@sentry/react-native';
+import * as Notifications from 'expo-notifications';
+import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
@@ -10,7 +12,14 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Toaster } from 'sonner-native';
 import '../global.css';
 
+import { ErrorBoundary } from '@/components/sidequest/error-boundary';
+import { OfflineBanner } from '@/components/sidequest/offline-banner';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+
+Sentry.init({
+  dsn: 'https://examplePublicKey@o0.ingest.sentry.io/0', // Replace with actual DSN
+  debug: __DEV__,
+});
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -18,19 +27,29 @@ export const unstable_settings = {
 
 SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
+function RootLayout() {
   const colorScheme = useColorScheme();
   const [isReady, setIsReady] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     // Request location permissions on startup
-    // We import dynamically or use the service instance if initialized
     import('@/lib/services/location-service').then(({ locationService }) => {
       locationService.requestPermissions();
     });
 
+    // Handle notification taps
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const url = response.notification.request.content.data?.url;
+      if (url && typeof url === 'string') {
+        router.push(url as any);
+      }
+    });
+
     setIsReady(true);
-  }, []);
+
+    return () => subscription.remove();
+  }, [router]);
 
   const onLayoutRootView = useCallback(() => {
     if (isReady) {
@@ -41,18 +60,33 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
-          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <Stack>
-              <Stack.Screen name="index" options={{ headerShown: false }} />
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-            </Stack>
-            <StatusBar style="auto" />
-            <Toaster />
-          </ThemeProvider>
-        </View>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <StatusBar style="light" />
+          <ErrorBoundary>
+            <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+              <OfflineBanner />
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: '#111' },
+                }}
+              >
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen
+                  name="onboarding"
+                  options={{
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                  }}
+                />
+              </Stack>
+            </View>
+          </ErrorBoundary>
+          <Toaster />
+        </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
+
+export default Sentry.wrap(RootLayout);

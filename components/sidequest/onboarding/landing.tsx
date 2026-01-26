@@ -1,8 +1,7 @@
 import { authService } from '@/lib/auth';
-import { Image } from 'expo-image';
 import { Apple, Mail } from 'lucide-react-native';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type LandingProps = {
@@ -34,10 +33,10 @@ export function Landing({ onContinue, onEmailAuth }: LandingProps) {
               source={require('@/assets/images/android-chrome-512x512.png')}
               accessibilityLabel="Sidequest logo"
               className="h-16 w-16"
-              contentFit="contain"
+              resizeMode="contain"
             />
           </View>
-          <Text className="text-4xl font-bold text-white">Sidequest</Text>
+          <Text className="text-4xl font-bold text-white">sidequest</Text>
           <Text className="text-base text-gray-300">Making grocery runs rewarding</Text>
         </View>
 

@@ -2,12 +2,14 @@ import { useSupabaseUser } from '@/hooks/use-supabase-user';
 import { useHouseholdStore } from '@/lib/household-store';
 import { debtService, transactionService } from '@/lib/services';
 import type { DebtLedger, Transaction } from '@/lib/types';
+import { openVenmoPay, openVenmoRequest } from '@/lib/utils/venmo';
 import { useFocusEffect } from 'expo-router';
-import { DollarSign, ShoppingCart, Star, Trophy, UserPlus } from 'lucide-react-native';
+import { DollarSign, Settings, ShoppingCart, Star, Trophy, UserPlus } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HouseholdInvite } from '../household-invite';
+import { SettingsScreen } from '../settings-screen';
 
 
 export function ProfileTab() {
@@ -18,8 +20,10 @@ export function ProfileTab() {
   const [debts, setDebts] = useState<DebtLedger[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showInvite, setShowInvite] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const memberLookup = useMemo(() => {
     const palette = ['#0F8', '#8b5cf6', '#3b82f6', '#f97316', '#ec4899'];
@@ -52,7 +56,6 @@ export function ProfileTab() {
   const fetchData = useCallback(() => {
     if (!user?.id) return;
     let isMounted = true;
-    setIsLoading(true);
     setError(null);
 
     Promise.all([debtService.listByUser(user.id), transactionService.listByUser(user.id)])
@@ -66,13 +69,21 @@ export function ProfileTab() {
         setError(err instanceof Error ? err.message : 'Failed to load profile data.');
       })
       .finally(() => {
-        if (isMounted) setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+          setRefreshing(false);
+        }
       });
 
     return () => {
       isMounted = false;
     };
   }, [user?.id]);
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchData();
+  }, [fetchData]);
 
   useFocusEffect(
     useCallback(() => {
@@ -127,18 +138,62 @@ export function ProfileTab() {
     { label: 'You Owe', value: `$${amountYouOwe.toFixed(2)}`, Icon: Star, color: '#8b5cf6' },
   ];
 
-  const handlePayWithVenmo = (lenderId: string, amount: number) => {
+  const handlePayWithVenmo = async (lenderId: string, amount: number) => {
     const target = memberLookup.get(lenderId);
-    if (target?.venmo) {
-      Alert.alert('Venmo', `Opening Venmo to pay ${target.name} $${amount.toFixed(2)} (@${target.venmo})`);
+    if (!target?.venmo) {
+      Alert.alert('Venmo handle missing', `${target?.name ?? 'Roommate'} hasn't added their Venmo handle yet. Ask them to add it in Settings.`);
       return;
     }
-    Alert.alert('Heads up', `${target?.name ?? 'Roommate'} has not added a Venmo handle yet.`);
+
+    const success = await openVenmoPay(
+      target.venmo,
+      amount,
+      `Sidequest: Payment to ${target.name}`
+    );
+
+    if (!success) {
+      Alert.alert('Could not open Venmo', 'Make sure Venmo is installed or try again.');
+    }
   };
 
-  const handleRemindRoommate = (borrowerId: string, amount: number) => {
+  const handleRequestWithVenmo = async (borrowerId: string, amount: number) => {
     const target = memberLookup.get(borrowerId);
-    Alert.alert('Reminder sent', `Pinged ${target?.name ?? 'your roommate'} about $${amount.toFixed(2)}.`);
+    if (!target?.venmo) {
+      Alert.alert('Venmo handle missing', `${target?.name ?? 'Roommate'} hasn't added their Venmo handle yet. Ask them to add it in Settings.`);
+      return;
+    }
+
+    const success = await openVenmoRequest(
+      target.venmo,
+      amount,
+      `Sidequest: Request from ${displayName}`
+    );
+
+    if (!success) {
+      Alert.alert('Could not open Venmo', 'Make sure Venmo is installed or try again.');
+    }
+  };
+
+  const handleSettleDebt = async (debtId: string, otherPersonName: string) => {
+    Alert.alert(
+      'Mark as Settled',
+      `Are you sure this debt with ${otherPersonName} is settled?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Yes, Settled',
+          onPress: async () => {
+            try {
+              await debtService.settleDebt(debtId);
+              // Remove from local state
+              setDebts((prev) => prev.filter((d) => d.id !== debtId));
+            } catch {
+              Alert.alert('Error', 'Failed to settle debt. Please try again.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (!user && isAuthLoading) {
@@ -152,15 +207,35 @@ export function ProfileTab() {
   if (!user) {
     return (
       <SafeAreaView edges={['top']} className="flex-1 items-center justify-center px-6" style={{ backgroundColor: '#222' }}>
-        <Text className="text-center text-white">Sign in to view your Sidequest profile.</Text>
+        <Text className="text-center text-white">Sign in to view your sidequest profile.</Text>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView edges={['top']} className="flex-1" style={{ backgroundColor: '#222' }}>
-      <ScrollView className="flex-1" contentContainerClassName="pb-10" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="pb-10"
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="#0F8"
+          />
+        }
+      >
         <View className="items-center border-b py-8" style={{ backgroundColor: '#2a2a2a', borderBottomColor: '#333' }}>
+          {/* Settings Gear Button */}
+          <Pressable
+            onPress={() => setShowSettings(true)}
+            className="absolute right-4 top-4 p-2"
+            accessibilityLabel="Settings"
+          >
+            <Settings size={22} color="#888" />
+          </Pressable>
+
           <View
             className="mb-3 h-[88px] w-[88px] items-center justify-center rounded-full"
             style={{ backgroundColor: '#0F8' }}
@@ -374,6 +449,14 @@ export function ProfileTab() {
                     >
                       <Text className="font-semibold text-white">Pay with Venmo</Text>
                     </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => handleSettleDebt(debt.id, lenderName)}
+                      className="mt-2 items-center justify-center rounded-2xl py-2"
+                      style={{ backgroundColor: '#333' }}
+                    >
+                      <Text className="text-sm font-semibold" style={{ color: '#0F8' }}>Mark as Settled</Text>
+                    </Pressable>
                   </View>
                 );
               })}
@@ -384,7 +467,7 @@ export function ProfileTab() {
         {debtsOwedToYou.length > 0 && (
           <View className="mb-4 px-6">
             <Text className="mb-3 text-sm" style={{ color: '#888' }}>
-              You're Owed
+              You&apos;re Owed
             </Text>
             <View className="gap-3">
               {debtsOwedToYou.map((debt) => {
@@ -416,11 +499,19 @@ export function ProfileTab() {
                       </Text>
                       <Pressable
                         accessibilityRole="button"
-                        onPress={() => handleRemindRoommate(debt.borrower_id, debt.amount)}
+                        onPress={() => handleRequestWithVenmo(debt.borrower_id, debt.amount)}
                         className="rounded-full px-3 py-1"
                         style={{ backgroundColor: '#333' }}
                       >
-                        <Text className="text-xs font-semibold text-white">Nudge</Text>
+                        <Text className="text-xs font-semibold text-white">Request</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={() => handleSettleDebt(debt.id, borrowerName)}
+                        className="ml-2 rounded-full px-3 py-1"
+                        style={{ backgroundColor: '#0F8' }}
+                      >
+                        <Text className="text-xs font-semibold text-black">Settled</Text>
                       </Pressable>
                     </View>
                   </View>
@@ -447,6 +538,20 @@ export function ProfileTab() {
 
       <Modal visible={showInvite} transparent animationType="slide" onRequestClose={() => setShowInvite(false)}>
         <HouseholdInvite onClose={() => setShowInvite(false)} />
+      </Modal>
+
+      <Modal visible={showSettings} animationType="slide" onRequestClose={() => setShowSettings(false)}>
+        {user && (
+          <SettingsScreen
+            user={{
+              id: user.id,
+              email: user.email ?? null,
+              display_name: currentMember?.profile?.display_name ?? null,
+              venmo_handle: currentMember?.profile?.venmo_handle ?? null,
+            }}
+            onClose={() => setShowSettings(false)}
+          />
+        )}
       </Modal>
     </SafeAreaView>
   );

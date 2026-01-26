@@ -14,7 +14,7 @@ export function HouseholdInvite({ onClose }: HouseholdInviteProps) {
   const houseName = useHouseholdStore((state) => state.houseName);
   const joinCode = useHouseholdStore((state) => state.joinCode);
 
-  const inviteMessage = `Join "${houseName}" on Sidequest! Use code: ${joinCode}`;
+  const inviteMessage = `Join "${houseName}" on sidequest! Use code: ${joinCode}`;
 
   const handleShare = async () => {
     try {
@@ -53,8 +53,8 @@ export function HouseholdInvite({ onClose }: HouseholdInviteProps) {
           <Text className="text-4xl font-bold tracking-[12px] text-white">{joinCode}</Text>
         </View>
 
-        <Text className="mb-4 text-center text-sm text-gray-400">
-          Share this code with your roommates so they can join "{houseName}"
+        <Text className="text-center text-gray-400">
+          Ask your roommate to tap &quot;Join Household&quot; and enter this code:
         </Text>
 
         <Pressable

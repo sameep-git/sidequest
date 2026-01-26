@@ -1,22 +1,23 @@
+import { AddItemModal } from '@/components/sidequest/shop/add-item-modal';
 import { ShoppingListItem } from '@/components/sidequest/shop/shopping-list-item';
 import { Button } from '@/components/ui/button';
+import { useNetworkStatus } from '@/hooks/use-network-status';
 import { useSupabaseUser } from '@/hooks/use-supabase-user';
 import { useHouseholdStore } from '@/lib/household-store';
 import { shoppingService } from '@/lib/services';
+import { useShoppingStore } from '@/lib/shopping-store';
 import type { ShoppingItem } from '@/lib/types';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Plus, X } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
+import { Plus, ShoppingBag, WifiOff } from 'lucide-react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
-  KeyboardAvoidingView,
   Platform,
-  Pressable,
+  RefreshControl,
   Text,
-  TextInput,
   View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,79 +30,184 @@ export function ShopTab() {
 
   const householdId = useHouseholdStore((state) => state.householdId);
   const { user } = useSupabaseUser();
+  const { isOffline } = useNetworkStatus();
 
-  const [items, setItems] = useState<ShoppingItem[]>([]);
-  // shoppingMode state removed
+  // Zustand store for offline persistence
+  const storeItems = useShoppingStore((state) => state.items);
+  const setStoreItems = useShoppingStore((state) => state.setItems);
+  const addStoreItem = useShoppingStore((state) => state.addItem);
+  const updateStoreItem = useShoppingStore((state) => state.updateItem);
+  const removeStoreItem = useShoppingStore((state) => state.removeItem);
+  const queueAction = useShoppingStore((state) => state.queueAction);
+  const syncOfflineActions = useShoppingStore((state) => state.syncOfflineActions);
+  const offlineQueue = useShoppingStore((state) => state.offlineQueue);
+  const isHydrated = useShoppingStore((state) => state.isHydrated);
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [primaryCtaHeight, setPrimaryCtaHeight] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [newItemName, setNewItemName] = useState('');
-  const [newItemBounty, setNewItemBounty] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
   const remainingItems = useMemo(
-    () => items.filter((item) => item.status !== 'purchased'),
-    [items]
+    () => storeItems.filter((item) => item.status !== 'purchased'),
+    [storeItems]
   );
 
+  // Sync offline actions when coming back online
+  useEffect(() => {
+    if (!isOffline && offlineQueue.length > 0) {
+      syncOfflineActions();
+    }
+  }, [isOffline, offlineQueue.length, syncOfflineActions]);
+
   const fetchItems = useCallback(async () => {
-    if (!householdId) return;
-    setIsLoading(true);
+    if (!householdId || isOffline) {
+      setIsLoading(false);
+      setRefreshing(false);
+      return;
+    }
     try {
       const data = await shoppingService.list(householdId);
-      setItems(data);
+      setStoreItems(data);
     } finally {
       setIsLoading(false);
+      setRefreshing(false);
     }
-  }, [householdId]);
+  }, [householdId, isOffline, setStoreItems]);
+
+  const handleRefresh = useCallback(() => {
+    if (isOffline) {
+      setRefreshing(false);
+      return;
+    }
+    setRefreshing(true);
+    fetchItems();
+  }, [fetchItems, isOffline]);
 
   useFocusEffect(
     useCallback(() => {
       if (!householdId) return;
-      fetchItems();
-    }, [fetchItems, householdId])
+      // Only show loading if no cached items
+      if (storeItems.length === 0) {
+        setIsLoading(true);
+      }
+      if (!isOffline) {
+        fetchItems();
+      } else {
+        setIsLoading(false);
+      }
+    }, [fetchItems, householdId, isOffline, storeItems.length])
   );
 
   const handleToggleComplete = async (item: ShoppingItem) => {
-    try {
-      const nextStatus = item.status === 'pending' ? 'purchased' : 'pending';
-      const updated = await shoppingService.updateStatus(item.id, nextStatus, user?.id ?? null);
-      setItems((prev) => prev.map((entry) => (entry.id === item.id ? updated : entry)));
-    } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to update item');
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const nextStatus = item.status === 'pending' ? 'purchased' : 'pending';
+
+    // Optimistic update
+    updateStoreItem(item.id, { status: nextStatus, purchased_by: nextStatus === 'purchased' ? user?.id ?? null : null });
+
+    if (isOffline) {
+      queueAction({
+        type: 'update',
+        payload: { id: item.id, status: nextStatus, purchased_by: nextStatus === 'purchased' ? user?.id ?? null : null },
+      });
+    } else {
+      try {
+        await shoppingService.updateStatus(item.id, nextStatus, user?.id ?? null);
+      } catch (err) {
+        // Revert on error
+        updateStoreItem(item.id, { status: item.status, purchased_by: item.purchased_by });
+        Alert.alert('Error', err instanceof Error ? err.message : 'Failed to update item');
+      }
     }
   };
 
   const handleDelete = async (id: string) => {
-    try {
-      await shoppingService.delete(id);
-      setItems((prev) => prev.filter((item) => item.id !== id));
-    } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to delete item');
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    // Optimistic delete
+    const deletedItem = storeItems.find((item) => item.id === id);
+    removeStoreItem(id);
+
+    if (isOffline) {
+      queueAction({ type: 'delete', payload: { id } });
+    } else {
+      try {
+        await shoppingService.delete(id);
+      } catch (err) {
+        // Revert on error
+        if (deletedItem) addStoreItem(deletedItem);
+        Alert.alert('Error', err instanceof Error ? err.message : 'Failed to delete item');
+      }
     }
   };
 
-  const handleAddItem = async () => {
-    if (!householdId || !newItemName.trim()) return;
+  const handleAddItem = async (name: string, category: string | null, bounty: number | null) => {
+    if (!householdId) return;
 
-    try {
-      const bounty = Number(newItemBounty);
-      const created = await shoppingService.create({
-        household_id: householdId,
-        name: newItemName.trim(),
-        category: null,
-        requested_by: user?.id ?? null,
-        bounty_amount: Number.isFinite(bounty) && bounty > 0 ? bounty : null,
-        status: 'pending',
+    const tempId = `temp-${Date.now()}`;
+    const newItem: ShoppingItem = {
+      id: tempId,
+      household_id: householdId,
+      name,
+      category,
+      requested_by: user?.id ?? null,
+      bounty_amount: bounty,
+      status: 'pending',
+      purchased_by: null,
+      purchased_at: null,
+      created_at: new Date().toISOString(),
+    };
+
+    // Optimistic add
+    addStoreItem(newItem);
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setShowAddModal(false);
+
+    if (isOffline) {
+      queueAction({
+        type: 'add',
+        payload: {
+          household_id: householdId,
+          name,
+          category,
+          requested_by: user?.id ?? null,
+          bounty_amount: bounty,
+          status: 'pending',
+        },
       });
+    } else {
+      try {
+        const created = await shoppingService.create({
+          household_id: householdId,
+          name,
+          category,
+          requested_by: user?.id ?? null,
+          bounty_amount: bounty,
+          status: 'pending',
+        });
 
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setItems((prev) => [created, ...prev]);
-      setNewItemName('');
-      setNewItemBounty('');
-      setShowAddModal(false);
-    } catch (err) {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to add item');
+        // Notify household if bounty added
+        if (bounty && user) {
+          import('@/lib/services/push-service').then(({ pushService }) => {
+            pushService.notifyBountyAdded(
+              householdId,
+              user.id,
+              user.user_metadata?.display_name || 'Roommate',
+              name,
+              bounty
+            );
+          });
+        }
+
+        // Replace temp item with real one
+        removeStoreItem(tempId);
+        addStoreItem(created);
+      } catch (err) {
+        removeStoreItem(tempId);
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert('Error', err instanceof Error ? err.message : 'Failed to add item');
+      }
     }
   };
 
@@ -113,14 +219,30 @@ export function ShopTab() {
     );
   }
 
-
+  // Wait for hydration before showing loading
+  if (!isHydrated) {
+    return (
+      <SafeAreaView edges={['top']} className="flex-1 items-center justify-center" style={{ backgroundColor: '#222' }}>
+        <ActivityIndicator color="#0F8" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView edges={['top']} className="flex-1" style={{ backgroundColor: '#222' }}>
       <View className="px-6 pb-4 pt-5" style={{ borderBottomColor: '#333', borderBottomWidth: 1 }}>
-        <Text className="text-3xl font-semibold text-white">Shopping List</Text>
+        <View className="flex-row items-center justify-between">
+          <Text className="text-3xl font-semibold text-white">Shopping List</Text>
+          {isOffline && (
+            <View className="flex-row items-center rounded-full bg-orange-500/20 px-3 py-1">
+              <WifiOff size={14} color="#f97316" />
+              <Text className="ml-1.5 text-xs font-medium" style={{ color: '#f97316' }}>Offline</Text>
+            </View>
+          )}
+        </View>
         <Text className="mt-1 text-sm" style={{ color: '#888' }}>
           {remainingItems.length} items to buy
+          {offlineQueue.length > 0 && ` • ${offlineQueue.length} pending sync`}
         </Text>
         <Button
           onPress={() => setShowAddModal(true)}
@@ -132,7 +254,7 @@ export function ShopTab() {
         </Button>
       </View>
 
-      {isLoading ? (
+      {isLoading && storeItems.length === 0 ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color="#0F8" />
         </View>
@@ -144,7 +266,14 @@ export function ShopTab() {
             paddingBottom: primaryCtaHeight + insets.bottom + tabBarClearance + 16,
           }}
           showsVerticalScrollIndicator={false}
-          data={items.sort((a, b) => {
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor="#0F8"
+            />
+          }
+          data={storeItems.sort((a, b) => {
             if (a.status === b.status) return 0;
             return a.status === 'pending' ? -1 : 1;
           })}
@@ -157,11 +286,16 @@ export function ShopTab() {
             />
           )}
           ListEmptyComponent={
-            <View className="items-center py-12">
-              <Text className="text-5xl">🎉</Text>
-              <Text className="mt-3 text-xl font-semibold text-white">Nothing to buy</Text>
-              <Text className="mt-1 text-sm" style={{ color: '#888' }}>
-                Add items to get started
+            <View className="items-center py-16">
+              <View
+                className="h-20 w-20 items-center justify-center rounded-full mb-4"
+                style={{ backgroundColor: 'rgba(15, 248, 136, 0.15)' }}
+              >
+                <ShoppingBag size={36} color="#0F8" />
+              </View>
+              <Text className="text-xl font-semibold text-white">Nothing to buy</Text>
+              <Text className="mt-2 text-sm text-center px-8" style={{ color: '#888' }}>
+                Tap &quot;Add&quot; to add items to your shared shopping list
               </Text>
             </View>
           }
@@ -176,68 +310,17 @@ export function ShopTab() {
         <Button
           size="lg"
           onPress={() => router.push('/scan')}
-          label="I'm Shopping Now"
+          label={isOffline ? "I'm Shopping Now (Offline)" : "I'm Shopping Now"}
           className="w-full"
+          disabled={isOffline}
         />
       </View>
 
-      {showAddModal && (
-        <View className="absolute inset-0 justify-end" style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={0}
-          >
-            <View
-              className="rounded-t-3xl border px-6 pb-8 pt-6"
-              style={{
-                backgroundColor: '#1f1f1f',
-                borderColor: '#333',
-                paddingBottom: Math.max(24, insets.bottom + 8),
-              }}
-            >
-              <Text className="text-xl font-semibold text-white">Add Item</Text>
-
-              <TextInput
-                className="mt-4 rounded-2xl border px-4 py-4 text-white"
-                style={{ backgroundColor: '#111', borderColor: '#333' }}
-                placeholder="Item name"
-                value={newItemName}
-                onChangeText={setNewItemName}
-                placeholderTextColor="#666"
-                autoFocus
-              />
-
-              <TextInput
-                className="mt-4 rounded-2xl border px-4 py-4 text-white"
-                style={{ backgroundColor: '#111', borderColor: '#333' }}
-                placeholder="Bounty (optional)"
-                keyboardType="decimal-pad"
-                value={newItemBounty}
-                onChangeText={setNewItemBounty}
-                placeholderTextColor="#666"
-              />
-
-              <Button
-                disabled={!newItemName.trim()}
-                onPress={handleAddItem}
-                label="Add to List"
-                size="lg"
-                className="mt-5 w-full"
-              />
-
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Close"
-                onPress={() => setShowAddModal(false)}
-                hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
-                className="absolute right-4 top-4 h-10 w-10 items-center justify-center"
-              >
-                <X size={20} color="#aaa" />
-              </Pressable>
-            </View>
-          </KeyboardAvoidingView>
-        </View>
-      )}
+      <AddItemModal
+        visible={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onAdd={handleAddItem}
+      />
     </SafeAreaView>
   );
 }

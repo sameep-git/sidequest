@@ -1,3 +1,4 @@
+import { useSupabaseUser } from '@/hooks/use-supabase-user';
 import { useHouseholdStore } from '@/lib/household-store';
 import { shoppingService, transactionService } from '@/lib/services';
 import { locationService, type GroceryStore } from '@/lib/services/location-service';
@@ -8,7 +9,7 @@ import { DollarSign, Trophy, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, Platform, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type HomeTabProps = {
   houseName: string;
@@ -32,7 +33,7 @@ type FeedEntry =
   };
 
 export function HomeTab({ houseName }: HomeTabProps) {
-  const insets = useSafeAreaInsets();
+
   const iosMajorVersion = Platform.OS === 'ios' ? Number.parseInt(String(Platform.Version), 10) : null;
   const tabBarClearance = Platform.OS !== 'ios' || (iosMajorVersion != null && iosMajorVersion >= 26) ? 88 : 0;
 
@@ -41,6 +42,7 @@ export function HomeTab({ houseName }: HomeTabProps) {
 
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const { user } = useSupabaseUser();
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedTxn, setSelectedTxn] = useState<Transaction | null>(null);
@@ -50,7 +52,7 @@ export function HomeTab({ houseName }: HomeTabProps) {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   useEffect(() => {
-    if (Platform.OS === 'ios') {
+    if (Platform.OS === 'ios' && user) {
       locationService.getCurrentLocation().then(loc => {
         if (loc) {
           setUserLocation(loc.coords);
@@ -59,10 +61,14 @@ export function HomeTab({ houseName }: HomeTabProps) {
             // Start monitoring when we find them
             locationService.startGeofencing(fetchedStores);
           });
+          // Register for push notifications
+          import('@/lib/services/push-service').then(({ pushService }) => {
+            pushService.registerForPushNotifications(user.id);
+          });
         }
       });
     }
-  }, []);
+  }, [user]);
 
   const handleSelectTransaction = async (txn: Transaction) => {
     setSelectedTxn(txn);
@@ -111,7 +117,7 @@ export function HomeTab({ houseName }: HomeTabProps) {
   );
 
   const topContributors = useMemo(() => {
-    if (!transactions.length) return [] as Array<{ userId: string; amount: number; name: string }>;
+    if (!transactions.length) return [] as { userId: string; amount: number; name: string }[];
 
     const totals = new Map<string, number>();
     transactions.forEach((txn) => {
