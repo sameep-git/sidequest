@@ -68,8 +68,9 @@ export default {
       [
         '@sentry/react-native/expo',
         {
-          organization: 'sidequest',
-          project: 'sidequest-app',
+          url: 'https://sentry.io/',
+          project: 'react-native',
+          organization: 'sidequest-cw',
         },
       ],
     ],

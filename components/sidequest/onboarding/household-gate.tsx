@@ -48,93 +48,93 @@ export function HouseholdGate({ onContinue }: HouseholdGateProps) {
 
   if (mode === 'choose') {
     return (
-      <SafeAreaView className="flex-1 bg-[#111]" edges={['top', 'bottom']}>
+      <SafeAreaView className="flex-1 bg-white dark:bg-[#111]" edges={['top', 'bottom']}>
         <View className="flex-1 px-6 pt-6 pb-8">
-        <View className="gap-2">
-          <Text className="text-3xl font-bold text-white">Find Your Household</Text>
-          <Text className="text-sm text-gray-400">Join or create a house to get started</Text>
-        </View>
-        <View className="mt-10 gap-4">
-          <Pressable
-            onPress={() => setMode('join')}
-            className="rounded-3xl border border-[#333] bg-[#1f1f1f] px-5 py-6"
-          >
-            <View className="flex-row items-center justify-between">
-              <View>
-                <View className="mb-3 h-12 w-12 items-center justify-center rounded-2xl bg-[#0F8]/30">
-                  <Home size={20} color="#0F8" />
+          <View className="gap-2">
+            <Text className="text-3xl font-bold text-black dark:text-white">Find Your Household</Text>
+            <Text className="text-sm text-gray-500 dark:text-gray-400">Join or create a house to get started</Text>
+          </View>
+          <View className="mt-10 gap-4">
+            <Pressable
+              onPress={() => setMode('join')}
+              className="rounded-3xl border border-gray-200 bg-gray-50 px-5 py-6 dark:border-[#333] dark:bg-[#1f1f1f]"
+            >
+              <View className="flex-row items-center justify-between">
+                <View>
+                  <View className="mb-3 h-12 w-12 items-center justify-center rounded-2xl bg-[#0F8]/30">
+                    <Home size={20} color="#0F8" />
+                  </View>
+                  <Text className="text-xl font-semibold text-black dark:text-white">Join Existing House</Text>
+                  <Text className="text-sm text-gray-500 dark:text-gray-400">Enter a 6-digit code</Text>
                 </View>
-                <Text className="text-xl font-semibold text-white">Join Existing House</Text>
-                <Text className="text-sm text-gray-400">Enter a 6-digit code</Text>
-              </View>
-              <View className="rounded-full bg-white/10 px-3 py-1">
-                <Text className="text-xs text-[#0F8]">Join</Text>
-              </View>
-            </View>
-          </Pressable>
-          <Pressable
-            onPress={() => setMode('create')}
-            className="rounded-3xl border border-[#333] bg-[#1f1f1f] px-5 py-6"
-          >
-            <View className="flex-row items-center justify-between">
-              <View>
-                <View className="mb-3 h-12 w-12 items-center justify-center rounded-2xl bg-[#0F8]/30">
-                  <Plus size={20} color="#0F8" />
+                <View className="rounded-full bg-black/5 px-3 py-1 dark:bg-white/10">
+                  <Text className="text-xs text-[#0F8]">Join</Text>
                 </View>
-                <Text className="text-xl font-semibold text-white">Create New House</Text>
-                <Text className="text-sm text-gray-400">Start fresh with roommates</Text>
               </View>
-              <View className="rounded-full bg-white/10 px-3 py-1">
-                <Text className="text-xs text-[#0F8]">Create</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setMode('create')}
+              className="rounded-3xl border border-gray-200 bg-gray-50 px-5 py-6 dark:border-[#333] dark:bg-[#1f1f1f]"
+            >
+              <View className="flex-row items-center justify-between">
+                <View>
+                  <View className="mb-3 h-12 w-12 items-center justify-center rounded-2xl bg-[#0F8]/30">
+                    <Plus size={20} color="#0F8" />
+                  </View>
+                  <Text className="text-xl font-semibold text-black dark:text-white">Create New House</Text>
+                  <Text className="text-sm text-gray-500 dark:text-gray-400">Start fresh with roommates</Text>
+                </View>
+                <View className="rounded-full bg-black/5 px-3 py-1 dark:bg-white/10">
+                  <Text className="text-xs text-[#0F8]">Create</Text>
+                </View>
               </View>
-            </View>
-          </Pressable>
-        </View>
+            </Pressable>
+          </View>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-[#111]" edges={['top', 'bottom']}>
-    <View className="flex-1 px-6 pt-6 pb-8">
-      <Pressable onPress={() => setMode('choose')}>
-        <Text className="text-sm text-[#0F8]">← Back</Text>
-      </Pressable>
-      <Text className="text-3xl font-bold text-white mt-4">
-        {mode === 'join' ? 'Join House' : 'Create House'}
-      </Text>
-      <Text className="text-sm text-gray-400 mt-2">
-        {mode === 'join'
-          ? 'Enter the 6-digit code from your roommate'
-          : 'Give your household a name'}
-      </Text>
-      <TextInput
-        style={styles.input}
-        className="mt-6 rounded-2xl border border-[#333] bg-[#1e1e1e] px-6 py-4 text-center text-2xl tracking-[12px] text-white"
-        value={mode === 'join' ? houseCode : houseName}
-        keyboardType={mode === 'join' ? 'number-pad' : 'default'}
-        placeholder={mode === 'join' ? '000000' : 'e.g., The Trap House'}
-        placeholderTextColor="#555"
-        maxLength={mode === 'join' ? 6 : undefined}
-        onChangeText={(value) =>
-          mode === 'join' ? setHouseCode(value.replace(/\D/g, '')) : setHouseName(value)
-        }
-      />
-      <Pressable
-        onPress={mode === 'join' ? handleJoin : handleCreate}
-        disabled={isLoading || (mode === 'join' ? houseCode.length !== 6 : !houseName.trim())}
-        className="mt-6 rounded-2xl bg-[#0F8] px-6 py-4 disabled:opacity-60"
-      >
-        {isLoading ? (
-          <ActivityIndicator color="#000" />
-        ) : (
-          <Text className="text-center text-lg font-semibold text-black">
-            {mode === 'join' ? 'Join House' : 'Create House'}
-          </Text>
-        )}
-      </Pressable>
-    </View>
+    <SafeAreaView className="flex-1 bg-white dark:bg-[#111]" edges={['top', 'bottom']}>
+      <View className="flex-1 px-6 pt-6 pb-8">
+        <Pressable onPress={() => setMode('choose')}>
+          <Text className="text-sm text-[#0F8]">← Back</Text>
+        </Pressable>
+        <Text className="text-3xl font-bold text-black dark:text-white mt-4">
+          {mode === 'join' ? 'Join House' : 'Create House'}
+        </Text>
+        <Text className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+          {mode === 'join'
+            ? 'Enter the 6-digit code from your roommate'
+            : 'Give your household a name'}
+        </Text>
+        <TextInput
+          style={styles.input}
+          className="mt-6 rounded-2xl border border-gray-200 bg-gray-50 px-6 py-4 text-center text-2xl tracking-[12px] text-black dark:border-[#333] dark:bg-[#1e1e1e] dark:text-white"
+          value={mode === 'join' ? houseCode : houseName}
+          keyboardType={mode === 'join' ? 'number-pad' : 'default'}
+          placeholder={mode === 'join' ? '000000' : 'e.g., The Trap House'}
+          placeholderTextColor="#999"
+          maxLength={mode === 'join' ? 6 : undefined}
+          onChangeText={(value) =>
+            mode === 'join' ? setHouseCode(value.replace(/\D/g, '')) : setHouseName(value)
+          }
+        />
+        <Pressable
+          onPress={mode === 'join' ? handleJoin : handleCreate}
+          disabled={isLoading || (mode === 'join' ? houseCode.length !== 6 : !houseName.trim())}
+          className="mt-6 rounded-2xl bg-[#0F8] px-6 py-4 disabled:opacity-60"
+        >
+          {isLoading ? (
+            <ActivityIndicator color="#000" />
+          ) : (
+            <Text className="text-center text-lg font-semibold text-black">
+              {mode === 'join' ? 'Join House' : 'Create House'}
+            </Text>
+          )}
+        </Pressable>
+      </View>
     </SafeAreaView>
   );
 }

@@ -1,11 +1,13 @@
 import { authService } from '@/lib/auth';
 import { useHouseholdStore } from '@/lib/household-store';
-import { userService } from '@/lib/services';
+import { householdService, userService } from '@/lib/services';
+import { useThemeStore } from '@/lib/theme-store';
 import { useRouter } from 'expo-router';
-import { ChevronRight, LogOut, Mail, Shield, User } from 'lucide-react-native';
+import { ChevronRight, LogOut, Mail, Moon, Shield, Smartphone, Sun, User } from 'lucide-react-native';
+import { useColorScheme } from 'nativewind';
 import { useState } from 'react';
-import { Alert, Pressable, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert, AlertButton, Pressable, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type SettingsScreenProps = {
     user: {
@@ -19,10 +21,22 @@ type SettingsScreenProps = {
 
 export function SettingsScreen({ user, onClose }: SettingsScreenProps) {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
+    const householdId = useHouseholdStore((state) => state.householdId);
+    const setMembers = useHouseholdStore((state) => state.setMembers);
     const resetHousehold = useHouseholdStore((state) => state.reset);
+    const { themeMode, setThemeMode } = useThemeStore();
+    const { colorScheme, setColorScheme } = useColorScheme();
+    const isDark = colorScheme === 'dark';
+
     const [displayName, setDisplayName] = useState(user.display_name ?? '');
     const [venmoHandle, setVenmoHandle] = useState(user.venmo_handle ?? '');
     const [isSaving, setIsSaving] = useState(false);
+
+    const handleThemeChange = (mode: 'light' | 'dark' | 'system') => {
+        setColorScheme(mode);
+        setThemeMode(mode);
+    };
 
     const handleSaveProfile = async () => {
         setIsSaving(true);
@@ -34,75 +48,108 @@ export function SettingsScreen({ user, onClose }: SettingsScreenProps) {
                 avatar_url: null,
                 venmo_handle: venmoHandle || null,
             });
+
+            // Refresh household members to update displayName in UI
+            if (householdId) {
+                const updatedMembers = await householdService.getMembers(householdId);
+                setMembers(updatedMembers);
+            }
+
             Alert.alert('Success', 'Profile updated');
         } catch {
-            Alert.alert('Error', 'Failed to update Venmo handle');
+            Alert.alert('Error', 'Failed to update profile');
         } finally {
             setIsSaving(false);
         }
     };
 
     const handleLogout = async () => {
-        Alert.alert(
-            'Sign Out',
-            'Are you sure you want to sign out?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Sign Out',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await authService.signOut();
-                            resetHousehold();
+        const buttons: AlertButton[] = [
+            { text: 'Cancel', style: 'cancel' },
+            {
+                text: 'Sign Out',
+                style: 'destructive',
+                onPress: async () => {
+                    try {
+                        onClose();
+                        await authService.signOut();
+                        resetHousehold();
+                        // Small delay to ensure modal is dismissed before navigating
+                        setTimeout(() => {
                             router.replace('/');
-                        } catch {
-                            Alert.alert('Error', 'Failed to sign out');
-                        }
-                    },
+                        }, 100);
+                    } catch (e) {
+                        console.error('Sign out failed:', e);
+                        Alert.alert('Error', 'Failed to sign out. Please try again.');
+                    }
                 },
-            ]
-        );
+            },
+        ];
+
+        Alert.alert('Sign Out', 'Are you sure you want to sign out?', buttons);
     };
 
+    // Use inline styles for immediate theme reactivity
+    const bgColor = isDark ? '#222' : '#f2f2f2';
+    const cardBg = isDark ? '#2a2a2a' : '#fff';
+    const borderColor = isDark ? '#333' : '#e5e7eb';
+    const textColor = isDark ? '#fff' : '#000';
+    const mutedText = isDark ? '#888' : '#6b7280';
+    const accentColor = isDark ? '#0F8' : '#059669';
+
     return (
-        <SafeAreaView className="flex-1" style={{ backgroundColor: '#222' }}>
+        <View style={{ flex: 1, backgroundColor: bgColor, paddingTop: insets.top }}>
             {/* Header */}
-            <View className="flex-row items-center justify-between border-b border-[#333] px-6 py-4">
-                <Pressable onPress={onClose} className="p-2 -ml-2">
-                    <Text className="text-[#0F8] font-semibold text-base">Done</Text>
+            <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                borderBottomWidth: 1,
+                borderBottomColor: borderColor,
+                paddingHorizontal: 24,
+                paddingVertical: 16,
+                backgroundColor: isDark ? '#222' : '#fff',
+            }}>
+                <Pressable
+                    onPress={onClose}
+                    style={{ padding: 8, marginLeft: -8 }}
+                    hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+                >
+                    <Text style={{ color: accentColor, fontWeight: '600', fontSize: 16 }}>Done</Text>
                 </Pressable>
-                <Text className="text-lg font-bold text-white">Settings</Text>
-                <View className="w-12" />
+                <Text style={{ fontSize: 18, fontWeight: '700', color: textColor }}>Settings</Text>
+                <View style={{ width: 48 }} />
             </View>
 
-            <View className="flex-1 px-6 pt-6">
+            <View style={{ flex: 1, paddingHorizontal: 24, paddingTop: 24 }}>
                 {/* Profile Section */}
-                <Text className="text-xs uppercase tracking-wider text-[#888] mb-3">Profile</Text>
-                <View className="rounded-2xl border border-[#333] bg-[#2a2a2a] mb-6">
-                    <View className="flex-row items-center px-4 py-3 border-b border-[#333]">
-                        <User size={18} color="#888" />
+                <Text style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: mutedText, marginBottom: 12 }}>Profile</Text>
+                <View style={{ borderRadius: 16, borderWidth: 1, backgroundColor: cardBg, borderColor, marginBottom: 24 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: borderColor }}>
+                        <User size={18} color={mutedText} />
                         <TextInput
-                            className="flex-1 ml-3 text-white text-base"
+                            style={{ flex: 1, marginLeft: 12, height: 24, color: textColor, fontSize: 16, padding: 0 }}
                             placeholder="Display Name"
-                            placeholderTextColor="#666"
+                            placeholderTextColor="#999"
                             value={displayName}
                             onChangeText={setDisplayName}
+                            textAlignVertical="center"
                         />
                     </View>
-                    <View className="flex-row items-center px-4 py-3 border-b border-[#333]">
-                        <Mail size={18} color="#888" />
-                        <Text className="flex-1 ml-3 text-[#666] text-base">{user.email ?? 'No email'}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: borderColor }}>
+                        <Mail size={18} color={mutedText} />
+                        <Text style={{ flex: 1, marginLeft: 12, color: mutedText, fontSize: 16 }}>{user.email ?? 'No email'}</Text>
                     </View>
-                    <View className="flex-row items-center px-4 py-3">
-                        <Text className="text-[#008CFF] text-base font-bold">V</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 }}>
+                        <Text style={{ color: '#008CFF', fontSize: 16, fontWeight: '700' }}>V</Text>
                         <TextInput
-                            className="flex-1 ml-3 text-white text-base"
+                            style={{ flex: 1, marginLeft: 12, height: 24, color: textColor, fontSize: 16, padding: 0 }}
                             placeholder="Venmo Handle (e.g., @username)"
                             placeholderTextColor="#666"
                             value={venmoHandle}
                             onChangeText={setVenmoHandle}
                             autoCapitalize="none"
+                            textAlignVertical="center"
                         />
                     </View>
                 </View>
@@ -110,47 +157,100 @@ export function SettingsScreen({ user, onClose }: SettingsScreenProps) {
                 <Pressable
                     onPress={handleSaveProfile}
                     disabled={isSaving}
-                    className="rounded-2xl py-3 px-4 mb-6"
-                    style={{ backgroundColor: '#0F8' }}
+                    style={{ borderRadius: 16, paddingVertical: 12, paddingHorizontal: 16, marginBottom: 24, backgroundColor: accentColor }}
                 >
-                    <Text className="text-center font-semibold text-black">
+                    <Text style={{ textAlign: 'center', fontWeight: '600', color: isDark ? '#000' : '#fff' }}>
                         {isSaving ? 'Saving...' : 'Save Profile'}
                     </Text>
                 </Pressable>
 
-                {/* Legal Section */}
-                <Text className="text-xs uppercase tracking-wider text-[#888] mb-3">Legal</Text>
-                <View className="rounded-2xl border border-[#333] bg-[#2a2a2a] mb-6">
-                    <Pressable className="flex-row items-center justify-between px-4 py-3 border-b border-[#333]">
-                        <View className="flex-row items-center">
-                            <Shield size={18} color="#888" />
-                            <Text className="ml-3 text-white text-base">Privacy Policy</Text>
-                        </View>
-                        <ChevronRight size={18} color="#666" />
+                {/* Appearance Section */}
+                <Text style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: mutedText, marginBottom: 12 }}>Appearance</Text>
+                <View style={{ borderRadius: 16, borderWidth: 1, backgroundColor: cardBg, borderColor, marginBottom: 24, flexDirection: 'row', overflow: 'hidden' }}>
+                    <Pressable
+                        onPress={() => handleThemeChange('system')}
+                        style={{
+                            flex: 1,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            paddingVertical: 12,
+                            borderRightWidth: 1,
+                            borderRightColor: borderColor,
+                            backgroundColor: themeMode === 'system' ? (isDark ? '#333' : '#f3f4f6') : 'transparent',
+                        }}
+                    >
+                        <Smartphone size={20} color={themeMode === 'system' ? accentColor : mutedText} />
+                        <Text style={{ fontSize: 12, marginTop: 4, color: themeMode === 'system' ? textColor : mutedText }}>System</Text>
                     </Pressable>
-                    <Pressable className="flex-row items-center justify-between px-4 py-3">
-                        <View className="flex-row items-center">
-                            <Shield size={18} color="#888" />
-                            <Text className="ml-3 text-white text-base">Terms of Service</Text>
+                    <Pressable
+                        onPress={() => handleThemeChange('dark')}
+                        style={{
+                            flex: 1,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            paddingVertical: 12,
+                            borderRightWidth: 1,
+                            borderRightColor: borderColor,
+                            backgroundColor: themeMode === 'dark' ? (isDark ? '#333' : '#f3f4f6') : 'transparent',
+                        }}
+                    >
+                        <Moon size={20} color={themeMode === 'dark' ? accentColor : mutedText} />
+                        <Text style={{ fontSize: 12, marginTop: 4, color: themeMode === 'dark' ? textColor : mutedText }}>Dark</Text>
+                    </Pressable>
+                    <Pressable
+                        onPress={() => handleThemeChange('light')}
+                        style={{
+                            flex: 1,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            paddingVertical: 12,
+                            backgroundColor: themeMode === 'light' ? (isDark ? '#333' : '#f3f4f6') : 'transparent',
+                        }}
+                    >
+                        <Sun size={20} color={themeMode === 'light' ? accentColor : mutedText} />
+                        <Text style={{ fontSize: 12, marginTop: 4, color: themeMode === 'light' ? textColor : mutedText }}>Light</Text>
+                    </Pressable>
+                </View>
+
+                {/* Legal Section */}
+                <Text style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: mutedText, marginBottom: 12 }}>Legal</Text>
+                <View style={{ borderRadius: 16, borderWidth: 1, backgroundColor: cardBg, borderColor, marginBottom: 24 }}>
+                    <Pressable
+                        onPress={() => Alert.alert('Privacy Policy', 'This would open the privacy policy.')}
+                        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: borderColor }}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Shield size={18} color={mutedText} />
+                            <Text style={{ marginLeft: 12, color: textColor, fontSize: 16 }}>Privacy Policy</Text>
                         </View>
-                        <ChevronRight size={18} color="#666" />
+                        <ChevronRight size={18} color={isDark ? '#666' : '#9ca3af'} />
+                    </Pressable>
+                    <Pressable
+                        onPress={() => Alert.alert('Terms of Service', 'This would open the terms of service.')}
+                        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 }}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Shield size={18} color={mutedText} />
+                            <Text style={{ marginLeft: 12, color: textColor, fontSize: 16 }}>Terms of Service</Text>
+                        </View>
+                        <ChevronRight size={18} color={isDark ? '#666' : '#9ca3af'} />
                     </Pressable>
                 </View>
 
                 {/* Logout Section */}
                 <Pressable
                     onPress={handleLogout}
-                    className="flex-row items-center justify-center rounded-2xl border border-red-500/40 bg-red-500/10 py-4"
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.4)', backgroundColor: 'rgba(239, 68, 68, 0.1)', paddingVertical: 16 }}
                 >
                     <LogOut size={18} color="#ef4444" />
-                    <Text className="ml-2 font-semibold text-red-400">Sign Out</Text>
+                    <Text style={{ marginLeft: 8, fontWeight: '600', color: '#f87171' }}>Sign Out</Text>
                 </Pressable>
 
                 {/* App Version */}
-                <Text className="text-center text-xs text-[#666] mt-6">
+                <Text style={{ textAlign: 'center', fontSize: 12, color: '#666', marginTop: 24 }}>
                     sidequest v1.0.0
                 </Text>
             </View>
-        </SafeAreaView>
+        </View>
     );
 }

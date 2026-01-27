@@ -42,7 +42,7 @@ export const useShoppingStore = create<ShoppingState>()(
 
             addItem: (item) =>
                 set((state) => ({
-                    items: [item, ...state.items],
+                    items: [item, ...state.items.filter((i) => i.id !== item.id)],
                 })),
 
             updateItem: (id, updates) =>

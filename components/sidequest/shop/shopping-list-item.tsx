@@ -24,8 +24,7 @@ export function ShoppingListItem({ item, onToggleComplete, onDelete }: ShoppingL
 
     return (
         <View
-            className="rounded-2xl border px-4 py-4 mb-3"
-            style={{ backgroundColor: '#2a2a2a', borderColor: '#333' }}
+            className="mb-3 rounded-2xl border border-gray-200 px-4 py-4 bg-white dark:border-[#333] dark:bg-[#2a2a2a]"
         >
             <View className="flex-row items-start">
                 {/* Checkbox */}
@@ -36,11 +35,11 @@ export function ShoppingListItem({ item, onToggleComplete, onDelete }: ShoppingL
                     className="mr-3 p-1"
                 >
                     <View
-                        className="h-6 w-6 items-center justify-center rounded-full border-2"
-                        style={{ borderColor: isCompleted ? '#0F8' : '#444' }}
+                        className={`h-6 w-6 items-center justify-center rounded-full border-2 ${isCompleted ? 'border-emerald-500 dark:border-[#0F8]' : 'border-gray-300 dark:border-[#444]'
+                            }`}
                     >
                         {isCompleted && (
-                            <View className="h-3 w-3 rounded-full" style={{ backgroundColor: '#0F8' }} />
+                            <View className="h-3 w-3 rounded-full bg-emerald-500 dark:bg-[#0F8]" />
                         )}
                     </View>
                 </Pressable>
@@ -50,7 +49,10 @@ export function ShoppingListItem({ item, onToggleComplete, onDelete }: ShoppingL
                     {/* Top Row: Name + Chips */}
                     <View className="flex-row items-center flex-wrap gap-2">
                         <Text
-                            className={`text-base font-semibold ${isCompleted ? 'text-white/50 line-through' : 'text-white'}`}
+                            className={`text-base font-semibold ${isCompleted
+                                    ? 'text-gray-400 line-through dark:text-white/50'
+                                    : 'text-black dark:text-white'
+                                }`}
                         >
                             {item.name}
                         </Text>
@@ -58,11 +60,10 @@ export function ShoppingListItem({ item, onToggleComplete, onDelete }: ShoppingL
                         {/* Bounty Chip */}
                         {item.bounty_amount != null && item.bounty_amount > 0 && (
                             <View
-                                className="flex-row items-center rounded-full px-2.5 py-1"
-                                style={{ backgroundColor: 'rgba(249, 115, 22, 0.2)', borderWidth: 1, borderColor: '#f97316' }}
+                                className="flex-row items-center rounded-full border border-orange-500 bg-orange-50 px-2.5 py-1 dark:bg-orange-500/20"
                             >
                                 <Flame size={12} color="#f97316" />
-                                <Text className="ml-1 text-xs font-bold" style={{ color: '#f97316' }}>
+                                <Text className="ml-1 text-xs font-bold text-orange-500">
                                     +${item.bounty_amount.toFixed(2)}
                                 </Text>
                             </View>
@@ -71,11 +72,10 @@ export function ShoppingListItem({ item, onToggleComplete, onDelete }: ShoppingL
                         {/* Claimed By Chip */}
                         {purchaserName && (
                             <View
-                                className="flex-row items-center rounded-full px-2.5 py-1"
-                                style={{ backgroundColor: 'rgba(15, 248, 136, 0.2)', borderWidth: 1, borderColor: '#0F8' }}
+                                className="flex-row items-center rounded-full border border-emerald-500 bg-emerald-50 px-2.5 py-1 dark:border-[#0F8] dark:bg-[#0F8]/20"
                             >
-                                <User size={12} color="#0F8" />
-                                <Text className="ml-1 text-xs font-semibold" style={{ color: '#0F8' }}>
+                                <User size={12} className="text-emerald-500 dark:text-[#0F8]" />
+                                <Text className="ml-1 text-xs font-semibold text-emerald-500 dark:text-[#0F8]">
                                     {purchaserName}
                                 </Text>
                             </View>
@@ -84,7 +84,7 @@ export function ShoppingListItem({ item, onToggleComplete, onDelete }: ShoppingL
 
                     {/* Bottom Row: Category */}
                     {item.category && (
-                        <Text className="mt-1.5 text-xs" style={{ color: '#888' }}>
+                        <Text className="mt-1.5 text-xs text-gray-500 dark:text-[#888]">
                             {item.category}
                         </Text>
                     )}

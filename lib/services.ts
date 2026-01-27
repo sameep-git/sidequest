@@ -345,4 +345,15 @@ export const debtService = {
 
     if (error) throw error;
   },
+
+  async settleAllDebts(borrowerId: string, lenderId: string): Promise<void> {
+    const { error } = await supabase
+      .from('debt_ledger')
+      .update({ is_settled: true })
+      .eq('borrower_id', borrowerId)
+      .eq('lender_id', lenderId)
+      .eq('is_settled', false);
+
+    if (error) throw error;
+  },
 };

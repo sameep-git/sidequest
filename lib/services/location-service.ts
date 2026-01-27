@@ -115,6 +115,8 @@ class LocationService {
 
 export const locationService = new LocationService();
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 // Define the background task
 TaskManager.defineTask(GEOFENCE_TASK_NAME, async ({ data, error }: any) => {
     if (error) {
@@ -123,18 +125,39 @@ TaskManager.defineTask(GEOFENCE_TASK_NAME, async ({ data, error }: any) => {
     }
     if (data?.eventType === Location.GeofencingEventType.Enter) {
         const { region } = data;
+        const storeId = region.identifier; // Use identifier as key
+        const now = Date.now();
+        const lastNotifKey = `LAST_ROGER_NOTIF_${storeId}`;
+        const COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 
-        await Notifications.scheduleNotificationAsync({
-            content: {
-                title: "🛒 You're at a grocery store!",
-                body: `Check the shopping list - you're near ${region.identifier}`,
-                data: { type: 'geofence', url: '/(tabs)/shop' },
-                sound: 'default',
-                sticky: true, // Persistent notification
-                autoDismiss: false,
-                priority: Notifications.AndroidNotificationPriority.HIGH,
-            },
-            trigger: null, // Send immediately
-        });
+        try {
+            const lastTimeStr = await AsyncStorage.getItem(lastNotifKey);
+            if (lastTimeStr) {
+                const lastTime = parseInt(lastTimeStr, 10);
+                if (now - lastTime < COOLDOWN_MS) {
+                    console.log(`Skipping notification for ${storeId} (cooldown active)`);
+                    return;
+                }
+            }
+
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: "🛒 You're at a grocery store!",
+                    body: `Check the shopping list - you're near ${region.identifier}`,
+                    data: { type: 'geofence', url: '/(tabs)/shop' },
+                    sound: 'default',
+                    sticky: true, // Persistent notification
+                    autoDismiss: false,
+                    priority: Notifications.AndroidNotificationPriority.HIGH,
+                },
+                trigger: null, // Send immediately
+            });
+
+            // Update timestamp
+            await AsyncStorage.setItem(lastNotifKey, now.toString());
+
+        } catch (e) {
+            console.error('Error in geofence task:', e);
+        }
     }
 });

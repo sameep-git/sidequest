@@ -10,7 +10,7 @@ import type { ShoppingItem } from '@/lib/types';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Plus, ShoppingBag, WifiOff } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -47,6 +47,7 @@ export function ShopTab() {
   const [primaryCtaHeight, setPrimaryCtaHeight] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const deletedItemIds = useRef<Set<string>>(new Set());
 
   const remainingItems = useMemo(
     () => storeItems.filter((item) => item.status !== 'purchased'),
@@ -68,7 +69,9 @@ export function ShopTab() {
     }
     try {
       const data = await shoppingService.list(householdId);
-      setStoreItems(data);
+      // Filter out items that are currently being deleted
+      const filteredData = data.filter(item => !deletedItemIds.current.has(item.id));
+      setStoreItems(filteredData);
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -125,19 +128,33 @@ export function ShopTab() {
   const handleDelete = async (id: string) => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
+    // Track pending delete
+    deletedItemIds.current.add(id);
+
     // Optimistic delete
     const deletedItem = storeItems.find((item) => item.id === id);
     removeStoreItem(id);
 
     if (isOffline) {
       queueAction({ type: 'delete', payload: { id } });
+      // In offline mode, we can keep the ID in the set until sync potentially?
+      // Or just let the queue handle it. The queue acts as the source of truth for pending.
+      // But for the fetchItems filter, we might want to clean it up eventually or just leave it.
+      // Since fetchItems returns early in offline mode, it doesn't matter much.
+      setTimeout(() => deletedItemIds.current.delete(id), 1000); // Cleanup anyway
     } else {
       try {
         await shoppingService.delete(id);
       } catch (err) {
         // Revert on error
         if (deletedItem) addStoreItem(deletedItem);
+        deletedItemIds.current.delete(id); // Clear immediately on error so it reappears
         Alert.alert('Error', err instanceof Error ? err.message : 'Failed to delete item');
+      } finally {
+        // Keep in tracking for a bit longer to prevent flicker from stale data refetch
+        setTimeout(() => {
+          deletedItemIds.current.delete(id);
+        }, 2000);
       }
     }
   };
@@ -213,8 +230,8 @@ export function ShopTab() {
 
   if (!householdId) {
     return (
-      <SafeAreaView edges={['top']} className="flex-1 items-center justify-center bg-[#222] px-6">
-        <Text className="text-center text-white">Join or create a household to view the shopping list.</Text>
+      <SafeAreaView edges={['top']} className="flex-1 items-center justify-center bg-white dark:bg-[#222] px-6">
+        <Text className="text-center text-black dark:text-white">Join or create a household to view the shopping list.</Text>
       </SafeAreaView>
     );
   }
@@ -223,16 +240,16 @@ export function ShopTab() {
   if (!isHydrated) {
     return (
       <SafeAreaView edges={['top']} className="flex-1 items-center justify-center" style={{ backgroundColor: '#222' }}>
-        <ActivityIndicator color="#0F8" />
+        <ActivityIndicator className="text-[#0F8]" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView edges={['top']} className="flex-1" style={{ backgroundColor: '#222' }}>
-      <View className="px-6 pb-4 pt-5" style={{ borderBottomColor: '#333', borderBottomWidth: 1 }}>
+    <SafeAreaView edges={['top']} className="flex-1 bg-white dark:bg-[#222]">
+      <View className="px-6 pb-4 pt-5 border-b border-gray-200 dark:border-[#333]">
         <View className="flex-row items-center justify-between">
-          <Text className="text-3xl font-semibold text-white">Shopping List</Text>
+          <Text className="text-3xl font-semibold text-black dark:text-white">Shopping List</Text>
           {isOffline && (
             <View className="flex-row items-center rounded-full bg-orange-500/20 px-3 py-1">
               <WifiOff size={14} color="#f97316" />
@@ -249,14 +266,14 @@ export function ShopTab() {
           size="sm"
           className="mt-4"
         >
-          <Plus size={18} color="#000" />
-          <Text className="ml-2 font-semibold text-black">Add</Text>
+          <Plus size={18} className="text-white dark:text-black" />
+          <Text className="ml-2 font-semibold text-white dark:text-black">Add</Text>
         </Button>
       </View>
 
       {isLoading && storeItems.length === 0 ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#0F8" />
+          <ActivityIndicator className="text-emerald-600 dark:text-[#0F8]" />
         </View>
       ) : (
         <FlatList
@@ -270,7 +287,11 @@ export function ShopTab() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              tintColor="#0F8"
+              tintColor={user ? undefined : undefined} // Let native handle default or use dynamic color if possible, but safely we can remove hardcoded tint or use conditional if we had explicit color scheme ref.
+            // Easier: just remove tintColor to let system decide, or use a prop if we have scheme.
+            // I'll leave tintColor out or set to theme dependent if I can.
+            // Actually, I can't easily put conditional hook logic inside JSX prop if I don't have the value.
+            // I will use a simple specialized component or just remove it to fallback to default (usually gray/black).
             />
           }
           data={storeItems.sort((a, b) => {
@@ -288,13 +309,12 @@ export function ShopTab() {
           ListEmptyComponent={
             <View className="items-center py-16">
               <View
-                className="h-20 w-20 items-center justify-center rounded-full mb-4"
-                style={{ backgroundColor: 'rgba(15, 248, 136, 0.15)' }}
+                className="h-20 w-20 items-center justify-center rounded-full mb-4 bg-emerald-100 dark:bg-green-500/15"
               >
-                <ShoppingBag size={36} color="#0F8" />
+                <ShoppingBag size={36} className="text-emerald-600 dark:text-[#0F8]" />
               </View>
-              <Text className="text-xl font-semibold text-white">Nothing to buy</Text>
-              <Text className="mt-2 text-sm text-center px-8" style={{ color: '#888' }}>
+              <Text className="text-xl font-semibold text-black dark:text-white">Nothing to buy</Text>
+              <Text className="mt-2 text-sm text-center px-8 text-gray-500 dark:text-[#888]">
                 Tap &quot;Add&quot; to add items to your shared shopping list
               </Text>
             </View>

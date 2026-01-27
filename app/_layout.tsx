@@ -17,7 +17,7 @@ import { OfflineBanner } from '@/components/sidequest/offline-banner';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 Sentry.init({
-  dsn: 'https://examplePublicKey@o0.ingest.sentry.io/0', // Replace with actual DSN
+  dsn: 'https://f12c21dc33e30baf6fc6221b080a44ed@o4510778241515520.ingest.us.sentry.io/4510778242301952',
   debug: __DEV__,
 });
 
@@ -68,7 +68,7 @@ function RootLayout() {
               <Stack
                 screenOptions={{
                   headerShown: false,
-                  contentStyle: { backgroundColor: '#111' },
+                  contentStyle: { backgroundColor: colorScheme === 'dark' ? '#111' : '#f2f2f2' },
                 }}
               >
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

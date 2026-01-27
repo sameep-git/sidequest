@@ -94,29 +94,28 @@ export function ItemEditorView({
     );
 
     return (
-        <SafeAreaView edges={['top']} className="flex-1" style={{ backgroundColor: '#222' }}>
-            <View className="px-6 pb-4" style={{ paddingTop: 32, borderBottomWidth: 1, borderBottomColor: '#333' }}>
+        <SafeAreaView edges={['top']} className="flex-1 bg-white dark:bg-[#222]">
+            <View className="border-b border-gray-200 px-6 pb-4 pt-8 dark:border-[#333]">
                 <View className="mb-3">
-                    <Text className="text-3xl font-semibold text-white">New Expense</Text>
-                    <Text className="mt-1 text-sm text-white/60">Total: ${totalAmount.toFixed(2)}</Text>
+                    <Text className="text-3xl font-semibold text-black dark:text-white">New Expense</Text>
+                    <Text className="mt-1 text-sm text-gray-500 dark:text-white/60">Total: ${totalAmount.toFixed(2)}</Text>
                 </View>
                 <View className="flex-row gap-3">
                     <Pressable
                         onPress={onScanNew}
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        className="flex-1 flex-row items-center justify-center rounded-xl bg-[#333] px-4 py-3"
+                        className="flex-1 flex-row items-center justify-center rounded-xl bg-gray-100 px-4 py-3 dark:bg-[#333]"
                     >
-                        <CameraIcon size={18} color="#0F8" />
-                        <Text className="ml-2 font-semibold text-white">Scan Receipt</Text>
+                        <CameraIcon size={18} className="text-emerald-500 dark:text-[#0F8]" />
+                        <Text className="ml-2 font-semibold text-black dark:text-white">Scan Receipt</Text>
                     </Pressable>
                     <Pressable
                         onPress={onAddItem}
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        className="flex-1 flex-row items-center justify-center rounded-xl px-4 py-3"
-                        style={{ backgroundColor: '#0F8' }}
+                        className="flex-1 flex-row items-center justify-center rounded-xl border border-emerald-500 bg-emerald-50 px-4 py-3 dark:border-0 dark:bg-[#0F8]"
                     >
-                        <Plus size={18} color="#000" />
-                        <Text className="ml-2 font-semibold text-black">Add Item</Text>
+                        <Plus size={18} className="text-emerald-700 dark:text-black" />
+                        <Text className="ml-2 font-semibold text-emerald-700 dark:text-black">Add Item</Text>
                     </Pressable>
                 </View>
             </View>
@@ -178,22 +177,25 @@ export function ItemEditorView({
                         {/* Shopping List Quick-Add Section */}
                         {pendingShoppingItems.length > 0 && (
                             <View className="mb-4">
-                                <Text className="text-xs text-white/50 uppercase mb-2">From Shopping List</Text>
+                                <Text className="mb-2 text-xs uppercase text-gray-500 dark:text-white/50">From Shopping List</Text>
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-6 px-6">
                                     <View className="flex-row gap-2">
                                         {pendingShoppingItems.map((item) => (
                                             <Pressable
                                                 key={item.id}
                                                 onPress={() => onAddFromShoppingList(item)}
-                                                className="flex-row items-center rounded-full px-3 py-2"
-                                                style={{ backgroundColor: item.bounty_amount ? '#f59e0b20' : '#333' }}
+                                                className={`flex-row items-center rounded-full px-3 py-2 ${item.bounty_amount
+                                                    ? 'bg-orange-50 dark:bg-[#f59e0b20]'
+                                                    : 'bg-gray-200 dark:bg-[#333]'
+                                                    }`}
                                             >
                                                 <Plus size={14} color={item.bounty_amount ? '#f59e0b' : '#888'} />
-                                                <Text className="ml-1 text-white font-medium text-sm" numberOfLines={1}>
+                                                <Text className={`ml-1 text-sm font-medium ${item.bounty_amount ? 'text-orange-600 dark:text-white' : 'text-black dark:text-white'
+                                                    }`} numberOfLines={1}>
                                                     {item.name}
                                                 </Text>
                                                 {item.bounty_amount ? (
-                                                    <Text className="ml-1 text-[#f59e0b] font-bold text-xs">
+                                                    <Text className="ml-1 text-xs font-bold text-orange-500 dark:text-[#f59e0b]">
                                                         +${item.bounty_amount.toFixed(0)}
                                                     </Text>
                                                 ) : null}
@@ -210,59 +212,52 @@ export function ItemEditorView({
                     const isAssigned = Boolean(item.assignedToUserId) || item.splitType === 'split';
                     const isSplit = item.splitType === 'split';
 
-                    let borderColor = '#333';
-                    let backgroundColor = '#2a2a2a';
-                    if (isSelected) {
-                        borderColor = '#0F8';
-                        backgroundColor = 'rgba(15, 248, 136, 0.15)';
-                    } else if (isAssigned) {
-                        if (isSplit) {
-                            borderColor = '#8b5cf6';
-                            backgroundColor = 'rgba(139, 92, 246, 0.08)';
-                        } else {
-                            borderColor = '#0F8';
-                            backgroundColor = 'rgba(15, 248, 136, 0.08)';
-                        }
-                    }
+                    // Determine container styles based on state and theme handled by NativeWind classes where possible,
+                    // but complex logic ensures we might need inline styles or clsx/utils.
+                    // Simplified approach: Default border logic.
 
                     return (
                         <Pressable
                             key={item.id}
                             accessibilityRole="button"
                             onPress={() => onSelect(item.id)}
-                            className="rounded-2xl border-2 px-4 py-4 mb-3"
-                            style={{ borderColor, backgroundColor }}
+                            className={`mb-3 rounded-2xl border-2 px-4 py-4 ${isSelected
+                                ? 'border-[#0F8] bg-[#0F8]/10 dark:bg-[#0F8]/20'
+                                : isAssigned
+                                    ? isSplit
+                                        ? 'border-violet-500 bg-violet-50 dark:bg-violet-500/10'
+                                        : 'border-[#0F8] bg-[#0F8]/10 dark:bg-[#0F8]/15'
+                                    : 'border-gray-200 bg-white dark:border-[#333] dark:bg-[#2a2a2a]'
+                                }`}
                         >
-                            <View className="flex-row items-center justify-between mb-2">
-                                <Text className="text-xs text-white/50 uppercase">Item Name</Text>
-                                <Text className="text-xs text-white/50 uppercase">Price</Text>
+                            <View className="mb-2 flex-row items-center justify-between">
+                                <Text className="text-xs uppercase text-gray-400 dark:text-white/50">Item Name</Text>
+                                <Text className="text-xs uppercase text-gray-400 dark:text-white/50">Price</Text>
                             </View>
                             <View className="flex-row items-center gap-2">
                                 <TextInput
-                                    className="flex-1 rounded-xl border px-3 py-2 text-white font-semibold"
-                                    style={{ backgroundColor: '#1a1a1a', borderColor: '#444' }}
+                                    className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 font-semibold text-black dark:border-[#444] dark:bg-[#1a1a1a] dark:text-white"
                                     value={item.name}
                                     onChangeText={(value) => onUpdateName(item.id, value)}
                                     placeholder="Item name"
-                                    placeholderTextColor="#666"
+                                    placeholderTextColor="#999"
                                 />
                                 <View className="flex-row items-center">
-                                    <Text className="text-white/60 mr-1">$</Text>
+                                    <Text className="mr-1 text-gray-400 dark:text-white/60">$</Text>
                                     <TextInput
-                                        className="w-20 rounded-xl border px-3 py-2 text-white font-semibold text-right"
-                                        style={{ backgroundColor: '#1a1a1a', borderColor: '#444' }}
+                                        className="w-20 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-right font-semibold text-black dark:border-[#444] dark:bg-[#1a1a1a] dark:text-white"
                                         keyboardType="decimal-pad"
                                         value={item.displayPrice ?? (Number.isFinite(item.price) ? item.price.toFixed(2) : '')}
                                         onChangeText={(value) => onUpdatePrice(item.id, value)}
                                         placeholder="0.00"
-                                        placeholderTextColor="#666"
+                                        placeholderTextColor="#999"
                                     />
                                 </View>
                                 <Pressable
                                     accessibilityRole="button"
                                     accessibilityLabel="Delete item"
                                     onPress={() => onDelete(item.id)}
-                                    className="p-3 ml-1"
+                                    className="ml-1 p-3"
                                 >
                                     <Trash2 size={18} color="#ef4444" />
                                 </Pressable>
@@ -298,8 +293,8 @@ export function ItemEditorView({
                 }}
                 ListEmptyComponent={
                     <View className="items-center py-12">
-                        <Text className="text-lg font-semibold text-white mb-2">No items yet</Text>
-                        <Text className="text-sm text-white/60 text-center">
+                        <Text className="mb-2 text-lg font-semibold text-black dark:text-white">No items yet</Text>
+                        <Text className="text-center text-sm text-gray-500 dark:text-white/60">
                             Use the buttons above to add items
                         </Text>
                     </View>
@@ -308,33 +303,30 @@ export function ItemEditorView({
                     <Pressable
                         accessibilityRole="button"
                         onPress={onAddItem}
-                        className="mt-4 flex-row items-center justify-center rounded-xl border-2 border-dashed py-3"
-                        style={{ borderColor: '#444' }}
+                        className="mt-4 flex-row items-center justify-center rounded-xl border-2 border-dashed border-gray-300 py-3 dark:border-[#444]"
                     >
-                        <Plus size={20} color="#666" />
-                        <Text className="ml-2 text-white/60 font-medium">Add Item</Text>
+                        <Plus size={20} className="text-gray-400 dark:text-[#666]" />
+                        <Text className="ml-2 font-medium text-gray-500 dark:text-white/60">Add Item</Text>
                     </Pressable>
                 }
             />
 
             {selectedItem !== null && (
-                <View className="px-6 py-4" style={{ borderTopWidth: 1, borderTopColor: '#333' }}>
-                    <Text className="mb-3 text-sm text-white/70">Assign to:</Text>
+                <View className="border-t border-gray-200 px-6 py-4 dark:border-[#333]">
+                    <Text className="mb-3 text-sm text-gray-500 dark:text-white/70">Assign to:</Text>
 
-                    <View className="flex-row flex-wrap gap-2 mb-4">
+                    <View className="mb-4 flex-row flex-wrap gap-2">
                         {/* All toggle */}
                         <Pressable
                             accessibilityRole="checkbox"
                             accessibilityState={{ checked: splitSelection.size === roommates.length + 1 }}
                             onPress={onSelectAllSplit}
-                            className="flex-row items-center px-4 py-2 rounded-xl"
-                            style={{
-                                backgroundColor: splitSelection.size === roommates.length + 1 ? 'rgba(139, 92, 246, 0.2)' : '#333',
-                                borderWidth: 2,
-                                borderColor: splitSelection.size === roommates.length + 1 ? '#8b5cf6' : 'transparent',
-                            }}
+                            className={`flex-row items-center rounded-xl border-2 px-4 py-2 ${splitSelection.size === roommates.length + 1
+                                ? 'border-violet-500 bg-violet-50 dark:bg-violet-500/20'
+                                : 'border-transparent bg-gray-200 dark:bg-[#333]'
+                                }`}
                         >
-                            <Text className="text-white font-medium">All</Text>
+                            <Text className="font-medium text-black dark:text-white">All</Text>
                         </Pressable>
 
                         {/* Me toggle */}
@@ -342,14 +334,12 @@ export function ItemEditorView({
                             accessibilityRole="checkbox"
                             accessibilityState={{ checked: user ? splitSelection.has(user.id) : false }}
                             onPress={() => user && onToggleSplitSelection(user.id)}
-                            className="flex-row items-center px-4 py-2 rounded-xl"
-                            style={{
-                                backgroundColor: user && splitSelection.has(user.id) ? 'rgba(15, 248, 136, 0.2)' : '#333',
-                                borderWidth: 2,
-                                borderColor: user && splitSelection.has(user.id) ? '#0F8' : 'transparent',
-                            }}
+                            className={`flex-row items-center rounded-xl border-2 px-4 py-2 ${user && splitSelection.has(user.id)
+                                ? 'border-[#0F8] bg-green-50 dark:bg-[#0F8/20]'
+                                : 'border-transparent bg-gray-200 dark:bg-[#333]'
+                                }`}
                         >
-                            <Text className="text-white font-medium">Me</Text>
+                            <Text className="font-medium text-black dark:text-white">Me</Text>
                         </Pressable>
 
                         {/* Roommate toggles */}
@@ -359,14 +349,12 @@ export function ItemEditorView({
                                 accessibilityRole="checkbox"
                                 accessibilityState={{ checked: splitSelection.has(roommate.id) }}
                                 onPress={() => onToggleSplitSelection(roommate.id)}
-                                className="flex-row items-center px-3 py-2 rounded-xl"
-                                style={{
-                                    backgroundColor: splitSelection.has(roommate.id) ? 'rgba(139, 92, 246, 0.2)' : '#333',
-                                    borderWidth: 2,
-                                    borderColor: splitSelection.has(roommate.id) ? '#8b5cf6' : 'transparent',
-                                }}
+                                className={`flex-row items-center rounded-xl border-2 px-3 py-2 ${splitSelection.has(roommate.id)
+                                    ? 'border-violet-500 bg-violet-50 dark:bg-violet-500/20'
+                                    : 'border-transparent bg-gray-200 dark:bg-[#333]'
+                                    }`}
                             >
-                                <Text className="text-white font-medium">{roommate.name.split(' ')[0]}</Text>
+                                <Text className="font-medium text-black dark:text-white">{roommate.name.split(' ')[0]}</Text>
                             </Pressable>
                         ))}
                     </View>
@@ -374,7 +362,7 @@ export function ItemEditorView({
                     {/* Done Button */}
                     <Pressable
                         onPress={() => onSelect(null)}
-                        className="items-center justify-center rounded-xl bg-[#333] py-3"
+                        className="items-center justify-center rounded-xl bg-black py-3 dark:bg-[#333]"
                     >
                         <Text className="font-semibold text-white">Done</Text>
                     </Pressable>
@@ -384,15 +372,14 @@ export function ItemEditorView({
             <View className="px-6" style={{ paddingBottom: insets.bottom + tabBarClearance }}>
                 <Pressable
                     accessibilityRole="button"
-                    className="items-center justify-center rounded-2xl py-4"
+                    className="items-center justify-center rounded-2xl py-4 bg-emerald-500 dark:bg-[#0F8]"
                     style={{
-                        backgroundColor: '#0F8',
                         opacity: !receiptItems.length || !allItemsAssigned || isPosting ? 0.4 : 1,
                     }}
                     onPress={onPost}
                     disabled={!receiptItems.length || !allItemsAssigned || isPosting}
                 >
-                    <Text className="font-semibold text-black">{isPosting ? 'Posting...' : 'Post to House'}</Text>
+                    <Text className="font-semibold text-white dark:text-black">{isPosting ? 'Posting...' : 'Post to House'}</Text>
                 </Pressable>
             </View>
 
@@ -440,10 +427,9 @@ export function ItemEditorView({
                         <View className="px-6 pb-6">
                             <Pressable
                                 onPress={onConfirmPost}
-                                className="items-center justify-center rounded-2xl py-4"
-                                style={{ backgroundColor: '#0F8' }}
+                                className="items-center justify-center rounded-2xl py-4 bg-emerald-500 dark:bg-[#0F8]"
                             >
-                                <Text className="font-semibold text-black">
+                                <Text className="font-semibold text-white dark:text-black">
                                     {isPosting ? 'Posting...' : 'Confirm & Post'}
                                 </Text>
                             </Pressable>

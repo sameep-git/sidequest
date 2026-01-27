@@ -609,16 +609,15 @@ export function ScanTab() {
   // Show offline message when trying to scan
   if (isOffline && (scanState === 'idle' || scanState === 'itemizing')) {
     return (
-      <SafeAreaView edges={['top']} className="flex-1 items-center justify-center" style={{ backgroundColor: '#222' }}>
+      <SafeAreaView edges={['top']} className="flex-1 items-center justify-center bg-white dark:bg-[#222]">
         <View className="items-center px-6">
           <View
-            className="h-20 w-20 items-center justify-center rounded-full mb-4"
-            style={{ backgroundColor: 'rgba(249, 115, 22, 0.15)' }}
+            className="h-20 w-20 items-center justify-center rounded-full mb-4 bg-orange-500/15"
           >
             <WifiOff size={36} color="#f97316" />
           </View>
-          <Text className="text-xl font-semibold text-white mb-2">You&apos;re Offline</Text>
-          <Text className="text-sm text-center text-[#888]">
+          <Text className="text-xl font-semibold text-black dark:text-white mb-2">You&apos;re Offline</Text>
+          <Text className="text-sm text-center text-gray-500 dark:text-[#888]">
             Receipt scanning requires an internet connection. You can still view and manage your shopping list while offline.
           </Text>
         </View>

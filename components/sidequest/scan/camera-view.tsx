@@ -23,11 +23,11 @@ export function CameraView({
 }: CameraViewProps) {
     if (isProcessing) {
         return (
-            <SafeAreaView edges={['top']} className="flex-1 items-center justify-center bg-[#222]">
+            <SafeAreaView edges={['top']} className="flex-1 items-center justify-center bg-white dark:bg-[#222]">
                 <View className="items-center">
                     <ActivityIndicator size="large" color="#0F8" />
-                    <Text className="mt-3 text-xl font-semibold text-white">Analyzing Receipt</Text>
-                    <Text className="mt-1 text-sm text-white/70">Detecting items and prices...</Text>
+                    <Text className="mt-3 text-xl font-semibold text-black dark:text-white">Analyzing Receipt</Text>
+                    <Text className="mt-1 text-sm text-gray-500 dark:text-white/70">Detecting items and prices...</Text>
                 </View>
             </SafeAreaView>
         );
