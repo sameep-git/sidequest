@@ -21,6 +21,8 @@ export default function IndexScreen() {
   const setHousehold = useHouseholdStore((state) => state.setHousehold);
   const setMembers = useHouseholdStore((state) => state.setMembers);
 
+
+
   // Check if user already has a household
   useEffect(() => {
     if (isAuthLoading) return;
@@ -53,12 +55,15 @@ export default function IndexScreen() {
           const permissionsGranted = await hasRequiredPermissions();
 
           if (permissionsGranted) {
+            console.log('[Index] Permissions granted. Navigating to tabs.');
             setIsNavigating(true);
             router.replace('/(tabs)');
           } else {
+            console.log('[Index] Permissions not granted. Setting phase to permissions.');
             setPhase('permissions');
           }
         } else {
+          console.log('[Index] No primary household found. Setting phase to household gate.');
           setPhase('household');
         }
       } catch (error) {
@@ -90,7 +95,7 @@ export default function IndexScreen() {
     return (
       <EmailAuth
         onSuccess={() => {
-          console.log('✅ Email auth success! Resetting to check household...');
+
           setPhase('loading');
           setHasCheckedHousehold(false);
         }}

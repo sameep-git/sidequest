@@ -36,8 +36,8 @@ export function Button({
 
     switch (variant) {
         case 'primary':
-            variantContainerStyle = "bg-[#0F8]";
-            variantTextStyle = "text-black";
+            variantContainerStyle = "bg-emerald-600 dark:bg-[#0F8]";
+            variantTextStyle = "text-white dark:text-black";
             break;
         case 'secondary':
             variantContainerStyle = "bg-[#333]";

@@ -2,15 +2,19 @@ import { useSupabaseUser } from '@/hooks/use-supabase-user';
 import { useHouseholdStore } from '@/lib/household-store';
 import { debtService, transactionService } from '@/lib/services';
 import type { DebtLedger, Transaction } from '@/lib/types';
+import { openVenmoPay, openVenmoRequest } from '@/lib/utils/venmo';
 import { useFocusEffect } from 'expo-router';
-import { DollarSign, ShoppingCart, Star, Trophy, UserPlus } from 'lucide-react-native';
+import { DollarSign, Settings, ShoppingCart, Star, Trophy, UserPlus } from 'lucide-react-native';
+import { useColorScheme } from 'nativewind';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HouseholdInvite } from '../household-invite';
+import { SettingsScreen } from '../settings-screen';
 
 
 export function ProfileTab() {
+  const { colorScheme } = useColorScheme();
   const householdId = useHouseholdStore((state) => state.householdId);
   const houseName = useHouseholdStore((state) => state.houseName);
   const members = useHouseholdStore((state) => state.members);
@@ -18,8 +22,10 @@ export function ProfileTab() {
   const [debts, setDebts] = useState<DebtLedger[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showInvite, setShowInvite] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const memberLookup = useMemo(() => {
     const palette = ['#0F8', '#8b5cf6', '#3b82f6', '#f97316', '#ec4899'];
@@ -52,7 +58,6 @@ export function ProfileTab() {
   const fetchData = useCallback(() => {
     if (!user?.id) return;
     let isMounted = true;
-    setIsLoading(true);
     setError(null);
 
     Promise.all([debtService.listByUser(user.id), transactionService.listByUser(user.id)])
@@ -66,13 +71,21 @@ export function ProfileTab() {
         setError(err instanceof Error ? err.message : 'Failed to load profile data.');
       })
       .finally(() => {
-        if (isMounted) setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+          setRefreshing(false);
+        }
       });
 
     return () => {
       isMounted = false;
     };
   }, [user?.id]);
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchData();
+  }, [fetchData]);
 
   useFocusEffect(
     useCallback(() => {
@@ -82,7 +95,23 @@ export function ProfileTab() {
   );
 
   const debtsYouOwe = useMemo(
-    () => (user ? debts.filter((debt) => !debt.is_settled && debt.borrower_id === user.id) : []),
+    () => {
+      if (!user) return [];
+      const myDebts = debts.filter((debt) => !debt.is_settled && debt.borrower_id === user.id);
+
+      // Aggregate by lender
+      const aggregated = new Map<string, DebtLedger>();
+      myDebts.forEach(debt => {
+        const existing = aggregated.get(debt.lender_id);
+        if (existing) {
+          existing.amount += debt.amount;
+        } else {
+          aggregated.set(debt.lender_id, { ...debt });
+        }
+      });
+
+      return Array.from(aggregated.values());
+    },
     [debts, user?.id]
   );
 
@@ -112,33 +141,73 @@ export function ProfileTab() {
   const totalSpent = transactions.reduce((sum, tx) => sum + tx.final_total, 0);
   const tripsLogged = transactions.length;
 
-  const reliabilityScore = totalSpent > 0
-    ? Math.max(55, Math.min(100, 100 - amountYouOwe + amountOwedToYou * 0.3))
-    : null;
-  const reliabilityDescription =
-    amountYouOwe === 0
-      ? 'All expenses are settled. Keep it up!'
-      : 'Settle outstanding IOUs to keep your score high.';
+
 
   const stats = [
-    { label: 'Trips Logged', value: String(tripsLogged), Icon: ShoppingCart, color: '#0F8' },
-    { label: 'Total Spent', value: `$${totalSpent.toFixed(0)}`, Icon: DollarSign, color: '#0F8' },
+    { label: 'Trips Logged', value: String(tripsLogged), Icon: ShoppingCart, color: colorScheme === 'dark' ? '#0F8' : '#059669' },
+    { label: 'Total Spent', value: `$${totalSpent.toFixed(0)}`, Icon: DollarSign, color: colorScheme === 'dark' ? '#0F8' : '#059669' },
     { label: 'You Are Owed', value: `$${amountOwedToYou.toFixed(2)}`, Icon: Trophy, color: '#facc15' },
     { label: 'You Owe', value: `$${amountYouOwe.toFixed(2)}`, Icon: Star, color: '#8b5cf6' },
   ];
 
-  const handlePayWithVenmo = (lenderId: string, amount: number) => {
+  const handlePayWithVenmo = async (lenderId: string, amount: number) => {
     const target = memberLookup.get(lenderId);
-    if (target?.venmo) {
-      Alert.alert('Venmo', `Opening Venmo to pay ${target.name} $${amount.toFixed(2)} (@${target.venmo})`);
+    if (!target?.venmo) {
+      Alert.alert('Venmo handle missing', `${target?.name ?? 'Roommate'} hasn't added their Venmo handle yet. Ask them to add it in Settings.`);
       return;
     }
-    Alert.alert('Heads up', `${target?.name ?? 'Roommate'} has not added a Venmo handle yet.`);
+
+    const success = await openVenmoPay(
+      target.venmo,
+      amount,
+      `Sidequest: Payment to ${target.name}`
+    );
+
+    if (!success) {
+      Alert.alert('Could not open Venmo', 'Make sure Venmo is installed or try again.');
+    }
   };
 
-  const handleRemindRoommate = (borrowerId: string, amount: number) => {
+  const handleRequestWithVenmo = async (borrowerId: string, amount: number) => {
     const target = memberLookup.get(borrowerId);
-    Alert.alert('Reminder sent', `Pinged ${target?.name ?? 'your roommate'} about $${amount.toFixed(2)}.`);
+    if (!target?.venmo) {
+      Alert.alert('Venmo handle missing', `${target?.name ?? 'Roommate'} hasn't added their Venmo handle yet. Ask them to add it in Settings.`);
+      return;
+    }
+
+    const success = await openVenmoRequest(
+      target.venmo,
+      amount,
+      `Sidequest: Request from ${displayName}`
+    );
+
+    if (!success) {
+      Alert.alert('Could not open Venmo', 'Make sure Venmo is installed or try again.');
+    }
+  };
+
+  const handleSettleDebt = async (borrowerId: string, lenderId: string, otherPersonName: string) => {
+    Alert.alert(
+      'Mark as Settled',
+      `Are you sure all debts with ${otherPersonName} are settled?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Yes, All Settled',
+          onPress: async () => {
+            try {
+              await debtService.settleAllDebts(borrowerId, lenderId);
+              // Remove from local state
+              setDebts((prev) => prev.filter((d) =>
+                !(d.borrower_id === borrowerId && d.lender_id === lenderId)
+              ));
+            } catch {
+              Alert.alert('Error', 'Failed to settle debts. Please try again.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (!user && isAuthLoading) {
@@ -152,32 +221,52 @@ export function ProfileTab() {
   if (!user) {
     return (
       <SafeAreaView edges={['top']} className="flex-1 items-center justify-center px-6" style={{ backgroundColor: '#222' }}>
-        <Text className="text-center text-white">Sign in to view your Sidequest profile.</Text>
+        <Text className="text-center text-white">Sign in to view your sidequest profile.</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView edges={['top']} className="flex-1" style={{ backgroundColor: '#222' }}>
-      <ScrollView className="flex-1" contentContainerClassName="pb-10" showsVerticalScrollIndicator={false}>
-        <View className="items-center border-b py-8" style={{ backgroundColor: '#2a2a2a', borderBottomColor: '#333' }}>
-          <View
-            className="mb-3 h-[88px] w-[88px] items-center justify-center rounded-full"
-            style={{ backgroundColor: '#0F8' }}
+    <SafeAreaView edges={['top']} className="flex-1 bg-white dark:bg-[#222]">
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="pb-10"
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="#0F8"
+          />
+        }
+      >
+        <View className="items-center border-b border-gray-200 dark:border-[#333] py-8 bg-gray-50 dark:bg-[#2a2a2a]">
+          {/* Settings Gear Button */}
+          <Pressable
+            onPress={() => setShowSettings(true)}
+            className="absolute right-4 top-4 p-2"
+            accessibilityLabel="Settings"
+            hitSlop={20}
           >
-            <Text className="text-4xl font-semibold text-black">{initials}</Text>
+            <Settings size={22} color="#888" />
+          </Pressable>
+
+          <View
+            className="mb-3 h-[88px] w-[88px] items-center justify-center rounded-full bg-emerald-500 dark:bg-[#0F8]"
+          >
+            <Text className="text-4xl font-semibold text-white dark:text-black">{initials}</Text>
           </View>
-          <Text className="text-2xl font-semibold text-white">{displayName}</Text>
-          <Text className="mt-1 text-sm text-white/70">
+          <Text className="text-2xl font-semibold text-black dark:text-white">{displayName}</Text>
+          <Text className="mt-1 text-sm text-gray-600 dark:text-white/70">
             {memberSince ? `Member since ${memberSince}` : householdId ? `Member of ${houseName || 'your house'}` : 'Add a household'}
           </Text>
           {householdId && (
             <Pressable
               onPress={() => setShowInvite(true)}
-              className="mt-4 flex-row items-center rounded-full border border-[#0F8] bg-[#0F8]/10 px-4 py-2"
+              className="mt-4 flex-row items-center rounded-full border border-emerald-500 bg-emerald-50 px-4 py-2 dark:border-[#0F8] dark:bg-[#0F8]/10"
             >
-              <UserPlus size={16} color="#0F8" />
-              <Text className="ml-2 font-semibold" style={{ color: '#0F8' }}>
+              <UserPlus size={16} className="text-emerald-500 dark:text-[#0F8]" />
+              <Text className="ml-2 font-semibold text-emerald-500 dark:text-[#0F8]">
                 Invite Roommates
               </Text>
             </Pressable>
@@ -188,14 +277,13 @@ export function ProfileTab() {
           {stats.map((item) => (
             <View
               key={item.label}
-              className="mb-3 w-[48%] rounded-2xl border p-4"
-              style={{ backgroundColor: '#1a1a1a', borderColor: '#333' }}
+              className="mb-3 w-[48%] rounded-2xl border p-4 bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-[#333]"
             >
               <View className="mb-3 h-12 w-12 items-center justify-center rounded-xl" style={{ backgroundColor: `${item.color}33` }}>
                 <item.Icon size={24} color={item.color} />
               </View>
-              <Text className="text-xl font-semibold text-white">{item.value}</Text>
-              <Text className="mt-1 text-xs" style={{ color: '#888' }}>
+              <Text className="text-xl font-semibold text-black dark:text-white">{item.value}</Text>
+              <Text className="mt-1 text-xs text-gray-500 dark:text-[#888]">
                 {item.label}
               </Text>
             </View>
@@ -206,10 +294,10 @@ export function ProfileTab() {
         {householdId && members.length > 0 && (
           <View className="mx-6 mb-4">
             <View className="mb-3 flex-row items-center justify-between">
-              <Text className="font-semibold text-white">Household Members</Text>
-              <Text className="text-xs" style={{ color: '#888' }}>{houseName}</Text>
+              <Text className="font-semibold text-black dark:text-white">Household Members</Text>
+              <Text className="text-xs text-gray-500 dark:text-[#888]">{houseName}</Text>
             </View>
-            <View className="rounded-2xl border p-4" style={{ backgroundColor: '#1a1a1a', borderColor: '#333' }}>
+            <View className="rounded-2xl border p-4 bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-[#333]">
               {/* Member List */}
               <View className="mb-4">
                 {members.map((entry, index) => {
@@ -233,8 +321,8 @@ export function ProfileTab() {
                   return (
                     <View
                       key={id}
-                      className="flex-row items-center py-2"
-                      style={{ borderBottomWidth: index < members.length - 1 ? 1 : 0, borderBottomColor: '#333' }}
+                      className="flex-row items-center py-2 border-b border-gray-200 dark:border-[#333]"
+                      style={{ borderBottomWidth: index < members.length - 1 ? 1 : 0 }}
                     >
                       <View
                         className="mr-3 h-10 w-10 items-center justify-center rounded-full"
@@ -243,8 +331,8 @@ export function ProfileTab() {
                         <Text className="text-sm font-semibold text-white">{name.charAt(0).toUpperCase()}</Text>
                       </View>
                       <View className="flex-1">
-                        <Text className="font-medium text-white">
-                          {name} {isCurrentUser && <Text style={{ color: '#0F8' }}>(You)</Text>}
+                        <Text className="font-medium text-black dark:text-white">
+                          {name} {isCurrentUser && <Text className="text-emerald-500 dark:text-[#0F8]">(You)</Text>}
                         </Text>
                         <Text className="text-xs" style={{ color: '#888' }}>
                           {entry.member.role === 'admin' ? 'Admin' : 'Member'}
@@ -255,7 +343,7 @@ export function ProfileTab() {
                           <>
                             <Text
                               className="text-sm font-semibold"
-                              style={{ color: netAmount > 0 ? '#0F8' : '#f97316' }}
+                              style={{ color: netAmount > 0 ? (colorScheme === 'dark' ? '#0F8' : '#10b981') : '#f97316' }}
                             >
                               {netAmount > 0 ? '+' : ''}${netAmount.toFixed(2)}
                             </Text>
@@ -276,33 +364,32 @@ export function ProfileTab() {
               {/* Quick Summary */}
               {(amountYouOwe > 0 || amountOwedToYou > 0) && (
                 <View
-                  className="rounded-xl p-3"
-                  style={{ backgroundColor: '#2a2a2a' }}
+                  className="rounded-xl p-3 bg-gray-100 dark:bg-[#2a2a2a]"
                 >
-                  <Text className="text-xs mb-2" style={{ color: '#888' }}>Your Balance</Text>
+                  <Text className="text-xs mb-2 text-gray-500 dark:text-[#888]">Your Balance</Text>
                   <View className="flex-row items-center justify-between">
                     <View className="items-center flex-1">
-                      <Text className="text-lg font-bold" style={{ color: '#0F8' }}>
+                      <Text className="text-lg font-bold" style={{ color: colorScheme === 'dark' ? '#0F8' : '#059669' }}>
                         ${amountOwedToYou.toFixed(2)}
                       </Text>
-                      <Text className="text-xs" style={{ color: '#666' }}>Owed to you</Text>
+                      <Text className="text-xs text-gray-500 dark:text-[#666]">Owed to you</Text>
                     </View>
-                    <View className="h-8 w-px" style={{ backgroundColor: '#444' }} />
+                    <View className="h-8 w-px bg-gray-300 dark:bg-[#444]" />
                     <View className="items-center flex-1">
                       <Text className="text-lg font-bold" style={{ color: '#f97316' }}>
                         ${amountYouOwe.toFixed(2)}
                       </Text>
-                      <Text className="text-xs" style={{ color: '#666' }}>You owe</Text>
+                      <Text className="text-xs text-gray-500 dark:text-[#666]">You owe</Text>
                     </View>
-                    <View className="h-8 w-px" style={{ backgroundColor: '#444' }} />
+                    <View className="h-8 w-px bg-gray-300 dark:bg-[#444]" />
                     <View className="items-center flex-1">
                       <Text
                         className="text-lg font-bold"
-                        style={{ color: amountOwedToYou - amountYouOwe >= 0 ? '#0F8' : '#f97316' }}
+                        style={{ color: amountOwedToYou - amountYouOwe >= 0 ? (colorScheme === 'dark' ? '#0F8' : '#059669') : '#f97316' }}
                       >
                         {amountOwedToYou - amountYouOwe >= 0 ? '+' : ''}${(amountOwedToYou - amountYouOwe).toFixed(2)}
                       </Text>
-                      <Text className="text-xs" style={{ color: '#666' }}>Net</Text>
+                      <Text className="text-xs text-gray-500 dark:text-[#666]">Net</Text>
                     </View>
                   </View>
                 </View>
@@ -311,20 +398,7 @@ export function ProfileTab() {
           </View>
         )}
 
-        {reliabilityScore !== null && (
-          <View className="mx-6 mb-4 rounded-3xl border p-4" style={{ backgroundColor: '#1a1a1a', borderColor: '#333' }}>
-            <View className="mb-3 flex-row items-center justify-between">
-              <Text className="font-semibold text-white">Reliability Score</Text>
-              <Text className="font-semibold" style={{ color: '#0F8' }}>
-                {reliabilityScore.toFixed(0)}%
-              </Text>
-            </View>
-            <View className="h-2 overflow-hidden rounded-full" style={{ backgroundColor: '#333' }}>
-              <View className="h-full" style={{ backgroundColor: '#0F8', width: `${reliabilityScore}%` }} />
-            </View>
-            <Text className="mt-3 text-sm text-white/70">{reliabilityDescription}</Text>
-          </View>
-        )}
+
 
         {isLoading && (
           <View className="items-center py-4">
@@ -341,7 +415,7 @@ export function ProfileTab() {
 
         {debtsYouOwe.length > 0 && (
           <View className="mb-4 px-6">
-            <Text className="mb-3 text-sm" style={{ color: '#888' }}>
+            <Text className="mb-3 text-sm text-gray-500 dark:text-[#888]">
               You Owe
             </Text>
             <View className="gap-3">
@@ -351,8 +425,7 @@ export function ProfileTab() {
                 return (
                   <View
                     key={debt.id}
-                    className="rounded-2xl border p-4"
-                    style={{ backgroundColor: '#2a2a2a', borderColor: '#333' }}
+                    className="rounded-2xl border p-4 bg-white dark:bg-[#2a2a2a] border-gray-200 dark:border-[#333]"
                   >
                     <View className="mb-3 flex-row items-center">
                       <View
@@ -362,8 +435,8 @@ export function ProfileTab() {
                         <Text className="text-base font-semibold text-white">{lenderName.charAt(0)}</Text>
                       </View>
                       <View>
-                        <Text className="font-semibold text-white">You owe {lenderName}</Text>
-                        <Text className="mt-1 text-2xl font-semibold text-white">${debt.amount.toFixed(2)}</Text>
+                        <Text className="font-semibold text-black dark:text-white">You owe {lenderName}</Text>
+                        <Text className="mt-1 text-2xl font-semibold text-black dark:text-white">${debt.amount.toFixed(2)}</Text>
                       </View>
                     </View>
                     <Pressable
@@ -374,6 +447,13 @@ export function ProfileTab() {
                     >
                       <Text className="font-semibold text-white">Pay with Venmo</Text>
                     </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => handleSettleDebt(debt.borrower_id, debt.lender_id, lenderName)}
+                      className="mt-2 items-center justify-center rounded-2xl py-2 bg-gray-100 dark:bg-[#333]"
+                    >
+                      <Text className="text-sm font-semibold text-emerald-600 dark:text-[#0F8]">Mark as All Settled</Text>
+                    </Pressable>
                   </View>
                 );
               })}
@@ -383,8 +463,8 @@ export function ProfileTab() {
 
         {debtsOwedToYou.length > 0 && (
           <View className="mb-4 px-6">
-            <Text className="mb-3 text-sm" style={{ color: '#888' }}>
-              You're Owed
+            <Text className="mb-3 text-sm text-gray-500 dark:text-[#888]">
+              You&apos;re Owed
             </Text>
             <View className="gap-3">
               {debtsOwedToYou.map((debt) => {
@@ -393,8 +473,7 @@ export function ProfileTab() {
                 return (
                   <View
                     key={debt.id}
-                    className="rounded-2xl border p-4"
-                    style={{ backgroundColor: '#1f1f1f', borderColor: '#333' }}
+                    className="rounded-2xl border p-4 bg-white dark:bg-[#1f1f1f] border-gray-200 dark:border-[#333]"
                   >
                     <View className="mb-3 flex-row items-center">
                       <View
@@ -404,8 +483,8 @@ export function ProfileTab() {
                         <Text className="text-base font-semibold text-white">{borrowerName.charAt(0)}</Text>
                       </View>
                       <View>
-                        <Text className="font-semibold text-white">{borrowerName} owes you</Text>
-                        <Text className="mt-1 text-2xl font-semibold" style={{ color: '#0F8' }}>
+                        <Text className="font-semibold text-black dark:text-white">{borrowerName} owes you</Text>
+                        <Text className="mt-1 text-2xl font-semibold text-emerald-600 dark:text-[#0F8]">
                           ${debt.amount.toFixed(2)}
                         </Text>
                       </View>
@@ -416,11 +495,17 @@ export function ProfileTab() {
                       </Text>
                       <Pressable
                         accessibilityRole="button"
-                        onPress={() => handleRemindRoommate(debt.borrower_id, debt.amount)}
-                        className="rounded-full px-3 py-1"
-                        style={{ backgroundColor: '#333' }}
+                        onPress={() => handleRequestWithVenmo(debt.borrower_id, debt.amount)}
+                        className="rounded-full px-3 py-1 bg-gray-100 dark:bg-[#333]"
                       >
-                        <Text className="text-xs font-semibold text-white">Nudge</Text>
+                        <Text className="text-xs font-semibold text-black dark:text-white">Request</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={() => handleSettleDebt(debt.borrower_id, debt.lender_id, borrowerName)}
+                        className="ml-2 rounded-full px-3 py-1 bg-emerald-500 dark:bg-[#0F8]"
+                      >
+                        <Text className="text-xs font-semibold text-white dark:text-black">Settled</Text>
                       </Pressable>
                     </View>
                   </View>
@@ -432,10 +517,10 @@ export function ProfileTab() {
 
         {!debtsYouOwe.length && !debtsOwedToYou.length && !isLoading && (
           <View className="px-6">
-            <View className="items-center rounded-2xl border p-6" style={{ backgroundColor: '#2a2a2a', borderColor: '#333' }}>
+            <View className="items-center rounded-2xl border p-6 bg-white dark:bg-[#2a2a2a] border-gray-200 dark:border-[#333]">
               <Text className="text-5xl">💳</Text>
-              <Text className="mt-3 text-xl font-semibold text-white">No Debts</Text>
-              <Text className="mt-2 text-sm" style={{ color: '#888' }}>
+              <Text className="mt-3 text-xl font-semibold text-black dark:text-white">No Debts</Text>
+              <Text className="mt-2 text-sm text-gray-500 dark:text-[#888]">
                 Peace and harmony in the house!
               </Text>
             </View>
@@ -447,6 +532,20 @@ export function ProfileTab() {
 
       <Modal visible={showInvite} transparent animationType="slide" onRequestClose={() => setShowInvite(false)}>
         <HouseholdInvite onClose={() => setShowInvite(false)} />
+      </Modal>
+
+      <Modal visible={showSettings} animationType="slide" onRequestClose={() => setShowSettings(false)}>
+        {user && (
+          <SettingsScreen
+            user={{
+              id: user.id,
+              email: user.email ?? null,
+              display_name: currentMember?.profile?.display_name ?? null,
+              venmo_handle: currentMember?.profile?.venmo_handle ?? null,
+            }}
+            onClose={() => setShowSettings(false)}
+          />
+        )}
       </Modal>
     </SafeAreaView>
   );

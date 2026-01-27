@@ -11,16 +11,14 @@ export default {
     ios: {
       bundleIdentifier: 'com.sameepshah.sidequest',
       supportsTablet: true,
+      buildNumber: '1',
       infoPlist: {
-        NSLocationWhenInUseUsageDescription: 'Sidequest needs your location to notify you when you\'re near stores with active bounties.',
-        NSLocationAlwaysAndWhenInUseUsageDescription: 'Sidequest needs your location always to send you notifications about nearby stores, even when the app is in the background.',
-        NSLocationAlwaysUsageDescription: 'Sidequest needs your location always to send you notifications about nearby stores, even when the app is in the background.',
-        NSCameraUsageDescription: 'Sidequest needs camera access to scan receipts and automatically split items.',
+        NSLocationWhenInUseUsageDescription: 'sidequest needs your location to notify you when you\'re near stores with active bounties.',
+        NSLocationAlwaysAndWhenInUseUsageDescription: 'sidequest needs your location always to send you notifications about nearby stores, even when the app is in the background.',
+        NSLocationAlwaysUsageDescription: 'sidequest needs your location always to send you notifications about nearby stores, even when the app is in the background.',
+        NSCameraUsageDescription: 'sidequest needs camera access to scan receipts and automatically split items.',
         UIBackgroundModes: ['location'],
         ITSAppUsesNonExemptEncryption: false,
-        NSAppTransportSecurity: {
-          NSAllowsArbitraryLoads: true,
-        },
       },
     },
     android: {
@@ -42,9 +40,9 @@ export default {
       [
         'expo-location',
         {
-          locationAlwaysAndWhenInUsePermission: 'Sidequest needs your location always to send you notifications about nearby stores, even when the app is in the background.',
-          locationAlwaysPermission: 'Sidequest needs your location always to send you notifications about nearby stores, even when the app is in the background.',
-          locationWhenInUsePermission: 'Sidequest needs your location to notify you when you\'re near stores with active bounties.',
+          locationAlwaysAndWhenInUsePermission: 'sidequest needs your location always to send you notifications about nearby stores, even when the app is in the background.',
+          locationAlwaysPermission: 'sidequest needs your location always to send you notifications about nearby stores, even when the app is in the background.',
+          locationWhenInUsePermission: 'sidequest needs your location to notify you when you\'re near stores with active bounties.',
           isAndroidBackgroundLocationEnabled: true,
           isAndroidForegroundServiceEnabled: true,
         },
@@ -52,7 +50,7 @@ export default {
       [
         'expo-camera',
         {
-          cameraPermission: 'Sidequest needs camera access to scan receipts and automatically split items.',
+          cameraPermission: 'sidequest needs camera access to scan receipts and automatically split items.',
         },
       ],
       [
@@ -65,6 +63,14 @@ export default {
           dark: {
             backgroundColor: '#111111',
           },
+        },
+      ],
+      [
+        '@sentry/react-native/expo',
+        {
+          url: 'https://sentry.io/',
+          project: 'react-native',
+          organization: 'sidequest-cw',
         },
       ],
     ],

@@ -1,3 +1,4 @@
+import { useSupabaseUser } from '@/hooks/use-supabase-user';
 import { useHouseholdStore } from '@/lib/household-store';
 import { shoppingService, transactionService } from '@/lib/services';
 import { locationService, type GroceryStore } from '@/lib/services/location-service';
@@ -5,10 +6,11 @@ import type { ShoppingItem, Transaction, TransactionItem } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { useFocusEffect } from 'expo-router';
 import { DollarSign, Trophy, X } from 'lucide-react-native';
+import { useColorScheme } from 'nativewind';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, Platform, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type HomeTabProps = {
   houseName: string;
@@ -32,15 +34,17 @@ type FeedEntry =
   };
 
 export function HomeTab({ houseName }: HomeTabProps) {
-  const insets = useSafeAreaInsets();
+
   const iosMajorVersion = Platform.OS === 'ios' ? Number.parseInt(String(Platform.Version), 10) : null;
   const tabBarClearance = Platform.OS !== 'ios' || (iosMajorVersion != null && iosMajorVersion >= 26) ? 88 : 0;
 
+  const { colorScheme } = useColorScheme();
   const householdId = useHouseholdStore((state) => state.householdId);
   const members = useHouseholdStore((state) => state.members);
 
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const { user } = useSupabaseUser();
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedTxn, setSelectedTxn] = useState<Transaction | null>(null);
@@ -50,7 +54,7 @@ export function HomeTab({ houseName }: HomeTabProps) {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   useEffect(() => {
-    if (Platform.OS === 'ios') {
+    if (Platform.OS === 'ios' && user) {
       locationService.getCurrentLocation().then(loc => {
         if (loc) {
           setUserLocation(loc.coords);
@@ -59,10 +63,14 @@ export function HomeTab({ houseName }: HomeTabProps) {
             // Start monitoring when we find them
             locationService.startGeofencing(fetchedStores);
           });
+          // Register for push notifications
+          import('@/lib/services/push-service').then(({ pushService }) => {
+            pushService.registerForPushNotifications(user.id);
+          });
         }
       });
     }
-  }, []);
+  }, [user]);
 
   const handleSelectTransaction = async (txn: Transaction) => {
     setSelectedTxn(txn);
@@ -111,7 +119,7 @@ export function HomeTab({ houseName }: HomeTabProps) {
   );
 
   const topContributors = useMemo(() => {
-    if (!transactions.length) return [] as Array<{ userId: string; amount: number; name: string }>;
+    if (!transactions.length) return [] as { userId: string; amount: number; name: string }[];
 
     const totals = new Map<string, number>();
     transactions.forEach((txn) => {
@@ -163,16 +171,16 @@ export function HomeTab({ houseName }: HomeTabProps) {
     : 0;
 
   return (
-    <SafeAreaView className="flex-1 bg-[#222]" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-white dark:bg-[#222]" edges={['top']}>
       <View className="flex-1">
-        <View className="border-b border-[#333] bg-[#2a2a2a] px-6 pb-6 pt-6">
-          <Text className="mb-1 text-sm text-[#888]">Your Household</Text>
-          <Text className="mb-4 text-[28px] font-bold text-white">{houseName || 'Household'}</Text>
+        <View className="border-b border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#2a2a2a] px-6 pb-6 pt-6">
+          <Text className="mb-1 text-sm text-gray-500 dark:text-[#888]">Your Household</Text>
+          <Text className="mb-4 text-[28px] font-bold text-black dark:text-white">{houseName || 'Household'}</Text>
 
-          <View className="rounded-[22px] border border-[#333] bg-[#1a1a1a] p-5">
+          <View className="rounded-[22px] border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] p-5">
             <View className="mb-3 flex-row items-center">
-              <Trophy size={18} color="#0F8" />
-              <Text className="ml-2 text-base font-semibold text-white">Top Contributors</Text>
+              <Trophy size={18} className="text-emerald-600 dark:text-[#0F8]" />
+              <Text className="ml-2 text-base font-semibold text-black dark:text-white">Top Contributors</Text>
             </View>
 
             {topContributors.length === 0 ? (
@@ -186,17 +194,17 @@ export function HomeTab({ houseName }: HomeTabProps) {
                   className="flex-row items-center"
                   style={{ marginBottom: index === topContributors.length - 1 ? 0 : 14 }}
                 >
-                  <Text className="w-4 text-[#888]">{index + 1}</Text>
-                  <View className="mr-2 h-10 w-10 items-center justify-center rounded-full border-2 border-[#333] bg-[#111]">
-                    <Text className="text-base font-bold text-white">
+                  <Text className="w-4 text-gray-400 dark:text-[#888]">{index + 1}</Text>
+                  <View className="mr-2 h-10 w-10 items-center justify-center rounded-full border-2 border-gray-200 dark:border-[#333] bg-gray-100 dark:bg-[#111]">
+                    <Text className="text-base font-bold text-black dark:text-white">
                       {roommate.name.charAt(0).toUpperCase()}
                     </Text>
                   </View>
 
                   <View className="flex-1">
                     <View className="mb-1 flex-row justify-between">
-                      <Text className="font-semibold text-white">{roommate.name}</Text>
-                      <Text className="text-[#888]">${roommate.amount.toFixed(2)}</Text>
+                      <Text className="font-semibold text-black dark:text-white">{roommate.name}</Text>
+                      <Text className="text-gray-500 dark:text-[#888]">${roommate.amount.toFixed(2)}</Text>
                     </View>
                     <ProgressBar value={maxSpent ? (roommate.amount / maxSpent) * 100 : 0} />
                   </View>
@@ -211,7 +219,7 @@ export function HomeTab({ houseName }: HomeTabProps) {
 
         <View className="flex-1 px-6 pt-4" style={{ paddingBottom: 0 }}>
           {Platform.OS === 'ios' && userLocation && (
-            <View className="mb-6 h-48 overflow-hidden rounded-3xl border border-[#333]">
+            <View className="mb-6 h-48 overflow-hidden rounded-3xl border border-gray-200 dark:border-[#333]">
               <MapView
                 provider={PROVIDER_DEFAULT}
                 style={{ flex: 1 }}
@@ -229,7 +237,7 @@ export function HomeTab({ houseName }: HomeTabProps) {
                     key={`${store.name}-${index}`}
                     coordinate={{ latitude: store.latitude, longitude: store.longitude }}
                     title={store.name}
-                    pinColor="#0F8"
+                    pinColor={colorScheme === 'dark' ? '#0F8' : '#059669'}
                   />
                 ))}
               </MapView>
@@ -237,7 +245,7 @@ export function HomeTab({ houseName }: HomeTabProps) {
           )}
 
 
-          <Text className="mb-3 uppercase tracking-wider text-[#aaa]">Recent Activity</Text>
+          <Text className="mb-3 uppercase tracking-wider text-gray-500 dark:text-[#aaa]">Recent Activity</Text>
 
           <ScrollView
             contentInsetAdjustmentBehavior={tabBarClearance > 0 ? 'automatic' : 'never'}
@@ -249,16 +257,16 @@ export function HomeTab({ houseName }: HomeTabProps) {
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchData} tintColor="#0F8" />}
           >
             {isLoading ? (
-              <Text className="text-sm text-[#777]">Loading activity...</Text>
+              <Text className="text-sm text-gray-500 dark:text-[#777]">Loading activity...</Text>
             ) : feedEntries.length === 0 ? (
-              <Text className="text-sm text-[#777]">No activity yet.</Text>
+              <Text className="text-sm text-gray-500 dark:text-[#777]">No activity yet.</Text>
             ) : (
               <View className="gap-4">
                 {feedEntries.map((entry) => (
                   <Pressable
                     key={entry.id}
                     onPress={() => entry.kind === 'transaction' && handleSelectTransaction(entry.originalTxn)}
-                    className="rounded-[18px] border border-[#333] bg-[#2a2a2a] p-4"
+                    className="rounded-[18px] border border-gray-200 dark:border-[#333] bg-white dark:bg-[#2a2a2a] p-4"
                     style={({ pressed }) => ({
                       opacity: pressed && entry.kind === 'transaction' ? 0.7 : 1,
                     })}
@@ -267,8 +275,8 @@ export function HomeTab({ houseName }: HomeTabProps) {
                       <View className="flex-row items-center">
                         <Text className="mr-3 text-2xl">🛒</Text>
                         <View className="flex-1">
-                          <Text className="text-[15px] text-white">{entry.title}</Text>
-                          <Text className="mt-1 text-xs text-[#777]">{timeAgo(entry.timestamp)}</Text>
+                          <Text className="text-[15px] font-medium text-black dark:text-white">{entry.title}</Text>
+                          <Text className="mt-1 text-xs text-gray-500 dark:text-[#777]">{timeAgo(entry.timestamp)}</Text>
                         </View>
                         {entry.bounty ? (
                           <Text className="font-semibold" style={{ color: '#f6b044' }}>
@@ -279,16 +287,15 @@ export function HomeTab({ houseName }: HomeTabProps) {
                     ) : (
                       <View className="flex-row items-center">
                         <View
-                          className="mr-3 h-9 w-9 items-center justify-center rounded-2xl"
-                          style={{ backgroundColor: 'rgba(15, 248, 136, 0.2)' }}
+                          className="mr-3 h-9 w-9 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-[#0F8]/20"
                         >
-                          <DollarSign size={16} color="#0F8" />
+                          <DollarSign size={16} className="text-emerald-600 dark:text-[#0F8]" />
                         </View>
                         <View className="flex-1">
-                          <Text className="text-[15px] text-white">{entry.title}</Text>
-                          <Text className="mt-1 text-xs text-[#777]">{timeAgo(entry.timestamp)}</Text>
+                          <Text className="text-[15px] font-medium text-black dark:text-white">{entry.title}</Text>
+                          <Text className="mt-1 text-xs text-gray-500 dark:text-[#777]">{timeAgo(entry.timestamp)}</Text>
                         </View>
-                        <Text className="font-semibold text-white">${entry.amount.toFixed(2)}</Text>
+                        <Text className="font-semibold text-black dark:text-white">${entry.amount.toFixed(2)}</Text>
                       </View>
                     )}
                   </Pressable>
@@ -306,46 +313,46 @@ export function HomeTab({ houseName }: HomeTabProps) {
           presentationStyle="pageSheet"
           onRequestClose={() => setSelectedTxn(null)}
         >
-          <View className="flex-1 bg-[#222]">
-            <View className="flex-row items-center justify-between border-b border-[#333] px-4 py-4">
-              <Text className="text-lg font-bold text-white">Trip Details</Text>
+          <View className="flex-1 bg-white dark:bg-[#222]">
+            <View className="flex-row items-center justify-between border-b border-gray-200 dark:border-[#333] px-4 py-4">
+              <Text className="text-lg font-bold text-black dark:text-white">Trip Details</Text>
               <Pressable
                 onPress={() => setSelectedTxn(null)}
                 className="p-2"
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <X size={24} color="#fff" />
+                <X size={24} className="text-black dark:text-white" />
               </Pressable>
             </View>
 
             <ScrollView className="flex-1 p-6">
               <View className="mb-6">
-                <Text className="text-sm text-[#888] mb-1">Paid by</Text>
+                <Text className="text-sm text-gray-500 dark:text-[#888] mb-1">Paid by</Text>
                 <View className="flex-row items-center">
-                  <Text className="text-xl font-semibold text-white">
+                  <Text className="text-xl font-semibold text-black dark:text-white">
                     {selectedTxn ? (memberLookup[selectedTxn.payer_id] || 'Unknown') : ''}
                   </Text>
                 </View>
               </View>
 
               <View className="mb-6">
-                <Text className="text-sm text-[#888] mb-1">Total</Text>
-                <Text className="text-3xl font-bold text-[#0F8]">
+                <Text className="text-sm text-gray-500 dark:text-[#888] mb-1">Total</Text>
+                <Text className="text-3xl font-bold text-emerald-600 dark:text-[#0F8]">
                   ${selectedTxn?.final_total.toFixed(2)}
                 </Text>
               </View>
 
-              <Text className="text-base font-semibold text-white mb-3">Items</Text>
+              <Text className="text-base font-semibold text-black dark:text-white mb-3">Items</Text>
               {loadingItems ? (
-                <Text className="text-[#888]">Loading items...</Text>
+                <Text className="text-gray-500 dark:text-[#888]">Loading items...</Text>
               ) : txnItems.length === 0 ? (
-                <Text className="text-[#888]">No item details available.</Text>
+                <Text className="text-gray-500 dark:text-[#888]">No item details available.</Text>
               ) : (
                 <View className="gap-3">
                   {txnItems.map((item) => (
-                    <View key={item.id} className="flex-row justify-between bg-[#333] p-3 rounded-xl">
-                      <Text className="text-white font-medium">{item.name}</Text>
-                      <Text className="text-white">${item.price.toFixed(2)}</Text>
+                    <View key={item.id} className="flex-row justify-between bg-gray-50 dark:bg-[#333] p-3 rounded-xl">
+                      <Text className="text-black dark:text-white font-medium">{item.name}</Text>
+                      <Text className="text-black dark:text-white">${item.price.toFixed(2)}</Text>
                     </View>
                   ))}
                 </View>
@@ -369,8 +376,8 @@ function ProgressBar({ value }: { value: number }) {
   const percent = Math.min(100, Math.max(0, Math.round(value)));
 
   return (
-    <View className="h-1.5 rounded-full bg-[#333]">
-      <View className="h-full rounded-full bg-[#0F8]" style={{ width: `${percent}%` }} />
+    <View className="h-1.5 rounded-full bg-gray-200 dark:bg-[#333]">
+      <View className="h-full rounded-full bg-emerald-500 dark:bg-[#0F8]" style={{ width: `${percent}%` }} />
     </View>
   );
 }

@@ -28,7 +28,7 @@ class LocationService {
         if (fgStatus !== 'granted') {
             Alert.alert(
                 'Location Required',
-                'Sidequest needs your location to find nearby grocery stores.',
+                'sidequest needs your location to find nearby grocery stores.',
                 [{ text: 'Open Settings', onPress: () => Linking.openSettings() }]
             );
             return false;
@@ -102,11 +102,11 @@ class LocationService {
             const isDefined = await TaskManager.isTaskDefined(GEOFENCE_TASK_NAME);
             if (!isDefined) {
                 // Task might be defined below but runtime check is good
-                console.log('Task definition check passed');
+
             }
 
             await Location.startGeofencingAsync(GEOFENCE_TASK_NAME, regions);
-            console.log(`Started geofencing ${regions.length} stores`);
+
         } catch (e) {
             console.error('Error starting geofencing:', e);
         }
@@ -114,6 +114,8 @@ class LocationService {
 }
 
 export const locationService = new LocationService();
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define the background task
 TaskManager.defineTask(GEOFENCE_TASK_NAME, async ({ data, error }: any) => {
@@ -123,15 +125,39 @@ TaskManager.defineTask(GEOFENCE_TASK_NAME, async ({ data, error }: any) => {
     }
     if (data?.eventType === Location.GeofencingEventType.Enter) {
         const { region } = data;
-        console.log('You entered a region:', region);
+        const storeId = region.identifier; // Use identifier as key
+        const now = Date.now();
+        const lastNotifKey = `LAST_ROGER_NOTIF_${storeId}`;
+        const COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 
-        await Notifications.scheduleNotificationAsync({
-            content: {
-                title: "You're near a grocery store!",
-                body: `Don't forget to check the shopping list at ${region.identifier}`,
-                data: { url: '/shop' }, // Deep link to shop tab
-            },
-            trigger: null, // Send immediately
-        });
+        try {
+            const lastTimeStr = await AsyncStorage.getItem(lastNotifKey);
+            if (lastTimeStr) {
+                const lastTime = parseInt(lastTimeStr, 10);
+                if (now - lastTime < COOLDOWN_MS) {
+                    console.log(`Skipping notification for ${storeId} (cooldown active)`);
+                    return;
+                }
+            }
+
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: "🛒 You're at a grocery store!",
+                    body: `Check the shopping list - you're near ${region.identifier}`,
+                    data: { type: 'geofence', url: '/(tabs)/shop' },
+                    sound: 'default',
+                    sticky: true, // Persistent notification
+                    autoDismiss: false,
+                    priority: Notifications.AndroidNotificationPriority.HIGH,
+                },
+                trigger: null, // Send immediately
+            });
+
+            // Update timestamp
+            await AsyncStorage.setItem(lastNotifKey, now.toString());
+
+        } catch (e) {
+            console.error('Error in geofence task:', e);
+        }
     }
 });
