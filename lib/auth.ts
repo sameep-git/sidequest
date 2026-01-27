@@ -86,17 +86,22 @@ export const authService = {
       if (authError) throw authError;
       if (!authData.user) throw new Error('No user returned from Supabase auth');
 
-      // Upsert user profile
+      // Upsert user profile - but PRESERVE existing values if new ones are null
       const displayName = appleCredential.fullName
         ? `${appleCredential.fullName.givenName || ''} ${appleCredential.fullName.familyName || ''}`.trim()
         : null;
 
+      // Fetch existing user to preserve their display_name, avatar_url, venmo_handle
+      const existingUser = await userService.getById(authData.user.id);
+
       const user = await userService.upsert({
         id: authData.user.id,
-        email: appleCredential.email || authData.user.email || null,
-        display_name: displayName || authData.user.user_metadata?.full_name || null,
-        avatar_url: null,
-        venmo_handle: null,
+        email: appleCredential.email || authData.user.email || existingUser?.email || null,
+        // Only update display_name if we have a new one, otherwise keep existing
+        display_name: displayName || existingUser?.display_name || authData.user.user_metadata?.full_name || null,
+        // Preserve existing avatar and venmo
+        avatar_url: existingUser?.avatar_url || null,
+        venmo_handle: existingUser?.venmo_handle || null,
       });
 
       return user;

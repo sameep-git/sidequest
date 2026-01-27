@@ -163,6 +163,16 @@ export const householdService = {
       };
     });
   },
+
+  async leave(householdId: string, userId: string): Promise<void> {
+    const { error } = await supabase
+      .from('household_members')
+      .delete()
+      .eq('household_id', householdId)
+      .eq('user_id', userId);
+
+    if (error) throw error;
+  },
 };
 
 export const shoppingService = {

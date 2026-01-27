@@ -8,8 +8,8 @@ import { useFocusEffect } from 'expo-router';
 import { DollarSign, Trophy, X } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal, Platform, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import { Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import MapView, { Callout, Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type HomeTabProps = {
@@ -48,6 +48,28 @@ export function HomeTab({ houseName }: HomeTabProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedTxn, setSelectedTxn] = useState<Transaction | null>(null);
+
+  // Theme-aware accent color
+  const isDark = colorScheme === 'dark';
+  const accentGreen = isDark ? '#0F8' : '#059669';
+
+  // Open navigation to a store using device's default map app
+  const handleOpenNavigation = useCallback((store: GroceryStore) => {
+    const { latitude, longitude, name } = store;
+    const encodedName = encodeURIComponent(name);
+
+    // Use Apple Maps on iOS, Google Maps on Android
+    const url = Platform.select({
+      ios: `maps://app?daddr=${latitude},${longitude}&q=${encodedName}`,
+      android: `google.navigation:q=${latitude},${longitude}`,
+      default: `https://maps.google.com/maps?daddr=${latitude},${longitude}`,
+    });
+
+    Linking.openURL(url).catch(() => {
+      // Fallback to Google Maps web if native fails
+      Linking.openURL(`https://maps.google.com/maps?daddr=${latitude},${longitude}`);
+    });
+  }, []);
   const [txnItems, setTxnItems] = useState<TransactionItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
   const [stores, setStores] = useState<GroceryStore[]>([]);
@@ -230,15 +252,24 @@ export function HomeTab({ houseName }: HomeTabProps) {
                   longitudeDelta: 0.04,
                 }}
                 showsUserLocation
-                userInterfaceStyle="dark"
+                userInterfaceStyle={isDark ? 'dark' : 'light'}
               >
                 {stores.map((store, index) => (
                   <Marker
                     key={`${store.name}-${index}`}
                     coordinate={{ latitude: store.latitude, longitude: store.longitude }}
                     title={store.name}
-                    pinColor={colorScheme === 'dark' ? '#0F8' : '#059669'}
-                  />
+                    description="Tap for directions"
+                    pinColor={accentGreen}
+                    onCalloutPress={() => handleOpenNavigation(store)}
+                  >
+                    <Callout tooltip={false}>
+                      <View style={{ padding: 8, minWidth: 120 }}>
+                        <Text style={{ fontWeight: '600', fontSize: 14, color: '#000' }}>{store.name}</Text>
+                        <Text style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Tap for directions →</Text>
+                      </View>
+                    </Callout>
+                  </Marker>
                 ))}
               </MapView>
             </View>
@@ -254,7 +285,7 @@ export function HomeTab({ houseName }: HomeTabProps) {
             contentContainerStyle={{ paddingBottom: tabBarClearance > 0 ? 24 : 12, marginBottom: 0 }}
             style={{ marginBottom: 0 }}
             showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchData} tintColor="#0F8" />}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchData} tintColor={accentGreen} />}
           >
             {isLoading ? (
               <Text className="text-sm text-gray-500 dark:text-[#777]">Loading activity...</Text>

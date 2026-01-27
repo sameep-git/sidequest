@@ -166,6 +166,8 @@ export function ScanTab() {
 
   useEffect(() => () => clearTimeouts(), []);
 
+  // handleSelectItem now handles initializing splitSelection correctly
+
   // Load shopping list on focus
   useFocusEffect(
     useCallback(() => {
@@ -312,15 +314,29 @@ export function ScanTab() {
       // Automatically apply the split logic
       const selectedIds = Array.from(newSet);
       if (selectedIds.length > 0) {
+        // Compute the display name
+        let displayName: string;
+        if (selectedIds.length === 1) {
+          const id = selectedIds[0];
+          if (user && id === user.id) {
+            displayName = 'Me';
+          } else {
+            const r = roommates.find(rm => rm.id === id);
+            displayName = r?.name || 'Roommate';
+          }
+        } else {
+          displayName = `Split (${selectedIds.length})`;
+        }
+
         setReceiptItems((items) =>
           items.map((item) =>
             item.id === selectedItem
               ? {
                 ...item,
-                assignedToUserId: undefined,
-                assignedToName: `Split (${selectedIds.length})`,
-                splitType: 'custom',
-                splitAmongIds: selectedIds,
+                assignedToUserId: selectedIds.length === 1 ? selectedIds[0] : undefined,
+                assignedToName: displayName,
+                splitType: selectedIds.length === 1 ? 'individual' : 'custom',
+                splitAmongIds: selectedIds.length === 1 ? undefined : selectedIds,
               }
               : item
           )
@@ -364,6 +380,46 @@ export function ScanTab() {
     if (selectedItem === id) {
       setSelectedItem(null);
     }
+
+    // If this was a shopping list item, restore it to "From Shopping List"
+    // Item IDs from shopping list are formatted as: shop-{shoppingItemId}-{randomSuffix}
+    if (id.startsWith('shop-')) {
+      const parts = id.split('-');
+      if (parts.length >= 2) {
+        const shoppingItemId = parts.slice(1, -1).join('-');
+        setAddedShoppingItemIds((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(shoppingItemId);
+          return newSet;
+        });
+      }
+    }
+  };
+
+  const handleSelectItem = (id: string | null) => {
+    setSelectedItem(id);
+    if (!id) return;
+
+    const item = receiptItems.find((i) => i.id === id);
+    if (!item) return;
+
+    // Initialize selection state based on existing assignment
+    const newSet = new Set<string>();
+
+    if (item.splitType === 'custom' && item.splitAmongIds) {
+      item.splitAmongIds.forEach(uid => newSet.add(uid));
+    } else if (item.splitType === 'split') {
+      // If 'split', it means everyone
+      if (user) newSet.add(user.id);
+      roommates.forEach(r => newSet.add(r.id));
+    } else if (item.assignedToUserId) {
+      newSet.add(item.assignedToUserId);
+    } else if (item.requestedByUserId) {
+      // Fallback: if from shopping list but unassigned, default to requester
+      newSet.add(item.requestedByUserId);
+    }
+
+    setSplitSelection(newSet);
   };
 
   const handleAddItem = () => {
@@ -374,20 +430,30 @@ export function ScanTab() {
       displayPrice: '',
     };
     setReceiptItems((prev) => [...prev, newItem]);
-    setSelectedItem(newItem.id);
+    // Don't auto-open splitter - let user tap when ready
   };
 
   const handleAddFromShoppingList = (shoppingItem: ShoppingItem) => {
+    // Determine who this item should be assigned to (requester, not buyer)
+    const requesterId = shoppingItem.requested_by;
+    let requesterName = 'Me';
+
+    if (requesterId && user && requesterId !== user.id) {
+      const member = members.find(m => m.member.user_id === requesterId);
+      requesterName = member?.profile?.display_name || member?.profile?.email || 'Roommate';
+    }
+
     const newItem: ReceiptItem = {
       id: `shop-${shoppingItem.id}-${Math.random().toString(36).slice(2, 4)}`,
       name: shoppingItem.name,
       price: 0,
       displayPrice: '',
-      assignedToUserId: user?.id,
+      assignedToUserId: requesterId ?? user?.id,
+      assignedToName: requesterName,
       splitType: 'individual',
+      requestedByUserId: requesterId ?? undefined,
     };
     setReceiptItems((prev) => [...prev, newItem]);
-    setSelectedItem(newItem.id);
     // Track this shopping item as added
     setAddedShoppingItemIds((prev) => new Set([...prev, shoppingItem.id]));
   };
@@ -576,15 +642,29 @@ export function ScanTab() {
     // Apply logic
     const selectedIds = Array.from(newSet);
     if (selectedIds.length > 0) {
+      // Compute the display name
+      let displayName: string;
+      if (selectedIds.length === 1) {
+        const id = selectedIds[0];
+        if (user && id === user.id) {
+          displayName = 'Me';
+        } else {
+          const r = roommates.find(rm => rm.id === id);
+          displayName = r?.name || 'Roommate';
+        }
+      } else {
+        displayName = `Split (${selectedIds.length})`;
+      }
+
       setReceiptItems((items) =>
         items.map((item) =>
           item.id === selectedItem
             ? {
               ...item,
-              assignedToUserId: undefined,
-              assignedToName: `Split (${selectedIds.length})`,
-              splitType: 'custom',
-              splitAmongIds: selectedIds,
+              assignedToUserId: selectedIds.length === 1 ? selectedIds[0] : undefined,
+              assignedToName: displayName,
+              splitType: selectedIds.length === 1 ? 'individual' : 'custom',
+              splitAmongIds: selectedIds.length === 1 ? undefined : selectedIds,
             }
             : item
         )
@@ -681,7 +761,7 @@ export function ScanTab() {
       onUpdateName={handleUpdateName}
       onUpdatePrice={handleUpdatePrice}
       onDelete={handleDeleteItem}
-      onSelect={setSelectedItem}
+      onSelect={handleSelectItem}
       onPost={handlePostToHouse}
       onBountyResponse={handleBountyResponse}
       onToggleSplitSelection={toggleSplitSelection}

@@ -7,6 +7,7 @@ export type ReceiptItem = {
     assignedToName?: string;
     splitType?: 'individual' | 'split' | 'custom';
     splitAmongIds?: string[];  // For custom splits - array of user IDs to split among
+    requestedByUserId?: string;  // Track who requested item (from shopping list)
 };
 
 type ParsedReceipt = {
