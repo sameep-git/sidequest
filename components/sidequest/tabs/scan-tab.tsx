@@ -6,6 +6,7 @@ import { useSupabaseUser } from '@/hooks/use-supabase-user';
 import { useHouseholdStore } from '@/lib/household-store';
 import { debtService, shoppingService, transactionService } from '@/lib/services';
 import type { ShoppingItem } from '@/lib/types';
+import { getDisplayName } from '@/lib/utils/display-name';
 import { buildReceiptFromLines, type ReceiptItem } from '@/lib/utils/receipt-parser';
 import { CameraView as ExpoCameraView } from 'expo-camera';
 import { useFocusEffect } from 'expo-router';
@@ -72,7 +73,7 @@ export function ScanTab() {
         return acc;
       }
 
-      const displayName = profile?.display_name || profile?.email || `Roommate ${paletteIndex + 1}`;
+      const displayName = getDisplayName(profile?.display_name, profile?.email, `Roommate ${paletteIndex + 1}`);
       const color = palette[paletteIndex % palette.length];
       paletteIndex += 1;
 
@@ -440,7 +441,7 @@ export function ScanTab() {
 
     if (requesterId && user && requesterId !== user.id) {
       const member = members.find(m => m.member.user_id === requesterId);
-      requesterName = member?.profile?.display_name || member?.profile?.email || 'Roommate';
+      requesterName = getDisplayName(member?.profile?.display_name, member?.profile?.email, 'Roommate');
     }
 
     const newItem: ReceiptItem = {
@@ -456,6 +457,18 @@ export function ScanTab() {
     setReceiptItems((prev) => [...prev, newItem]);
     // Track this shopping item as added
     setAddedShoppingItemIds((prev) => new Set([...prev, shoppingItem.id]));
+
+    // If this item has a bounty, add it to bountyMatches as confirmed
+    if (shoppingItem.bounty_amount && shoppingItem.bounty_amount > 0) {
+      setBountyMatches((prev) => [
+        ...prev,
+        {
+          receiptItem: newItem,
+          shoppingItem,
+          confirmed: true, // Auto-confirm since user explicitly added it
+        },
+      ]);
+    }
   };
 
   const pendingShoppingItems = useMemo(() =>
@@ -719,13 +732,30 @@ export function ScanTab() {
   }
 
   if (scanState === 'summary') {
+    const earnedBounty = bountyMatches
+      .filter(m => m.confirmed !== false)
+      .reduce((sum, m) => sum + (m.shoppingItem.bounty_amount || 0), 0);
+
+    // Calculate bounties per roommate (bounty is owed by the person who requested the item)
+    const roommateBounties: Record<string, number> = {};
+    bountyMatches
+      .filter(m => m.confirmed !== false)
+      .forEach(m => {
+        const requesterId = m.shoppingItem.requested_by;
+        if (requesterId && requesterId !== user?.id && m.shoppingItem.bounty_amount) {
+          roommateBounties[requesterId] = (roommateBounties[requesterId] || 0) + m.shoppingItem.bounty_amount;
+        }
+      });
+
     return (
       <SummaryView
         totalAmount={totalAmount}
         yourShare={yourShare}
         youAreOwed={youAreOwed}
+        earnedBounty={earnedBounty}
         roommates={roommates}
         roommateTotals={roommateTotals}
+        roommateBounties={roommateBounties}
         onDone={() => {
           setScanState('itemizing');
           setReceiptItems([]);

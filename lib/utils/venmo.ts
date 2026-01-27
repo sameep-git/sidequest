@@ -42,7 +42,9 @@ export function getVenmoDeepLink(options: VenmoDeepLinkOptions): string {
 export async function openVenmoPay(recipient: string, amount: number, note?: string): Promise<boolean> {
     const nativeUrl = getVenmoDeepLink({ action: 'pay', recipient, amount, note });
     const cleanRecipient = recipient.replace(/^@/, '');
-    const webUrl = `https://venmo.com/?txn=pay&recipients=${cleanRecipient}&amount=${amount.toFixed(2)}&note=${encodeURIComponent(note || 'Sidequest payment')}`;
+    // Web fallback using account.venmo.com format
+    // recipient needs to be prefixed with comma (%2C)
+    const webUrl = `https://account.venmo.com/pay?audience=private&amount=${amount.toFixed(2)}&note=${encodeURIComponent(note || 'Sidequest payment')}&recipients=%2C${cleanRecipient}&txn=pay`;
 
     try {
         // Try opening native app directly - don't rely on canOpenURL which requires LSApplicationQueriesSchemes
@@ -66,7 +68,9 @@ export async function openVenmoPay(recipient: string, amount: number, note?: str
 export async function openVenmoRequest(recipient: string, amount: number, note?: string): Promise<boolean> {
     const nativeUrl = getVenmoDeepLink({ action: 'charge', recipient, amount, note });
     const cleanRecipient = recipient.replace(/^@/, '');
-    const webUrl = `https://venmo.com/?txn=charge&recipients=${cleanRecipient}&amount=${amount.toFixed(2)}&note=${encodeURIComponent(note || 'Sidequest payment')}`;
+    // Web fallback using account.venmo.com format
+    // recipient needs to be prefixed with comma (%2C)
+    const webUrl = `https://account.venmo.com/pay?audience=private&amount=${amount.toFixed(2)}&note=${encodeURIComponent(note || 'Sidequest payment')}&recipients=%2C${cleanRecipient}&txn=charge`;
 
     try {
         // Try opening native app directly - don't rely on canOpenURL which requires LSApplicationQueriesSchemes

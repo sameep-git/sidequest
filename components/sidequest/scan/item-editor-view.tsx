@@ -200,7 +200,7 @@ export function ItemEditorView({
                                                 </Text>
                                                 {item.bounty_amount ? (
                                                     <Text className="ml-1 text-xs font-bold text-orange-500 dark:text-[#f59e0b]">
-                                                        +${item.bounty_amount.toFixed(0)}
+                                                        +${item.bounty_amount.toFixed(2)}
                                                     </Text>
                                                 ) : null}
                                             </Pressable>

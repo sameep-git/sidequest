@@ -1,5 +1,6 @@
 import { useHouseholdStore } from '@/lib/household-store';
 import { ShoppingItem } from '@/lib/types';
+import { getDisplayName } from '@/lib/utils/display-name';
 import { Check, Flame, Trash2, User, X } from 'lucide-react-native';
 import { useMemo } from 'react';
 import { Modal, Pressable, Text, useColorScheme, View } from 'react-native';
@@ -22,7 +23,7 @@ export function ItemDetailsSheet({ item, onClose, onToggleComplete, onDelete }: 
     const requesterInfo = useMemo(() => {
         if (!item?.requested_by) return null;
         const member = members.find(m => m.member.user_id === item.requested_by);
-        const name = member?.profile?.display_name ?? member?.profile?.email ?? 'Someone';
+        const name = getDisplayName(member?.profile?.display_name, member?.profile?.email, 'Someone');
         const initial = name.charAt(0).toUpperCase();
         const palette = [accentGreen, '#8b5cf6', '#3b82f6', '#f97316', '#ec4899'];
         const colorIndex = members.findIndex(m => m.member.user_id === item.requested_by);
@@ -33,7 +34,7 @@ export function ItemDetailsSheet({ item, onClose, onToggleComplete, onDelete }: 
     const purchaserName = useMemo(() => {
         if (!item?.purchased_by) return null;
         const member = members.find(m => m.member.user_id === item.purchased_by);
-        return member?.profile?.display_name ?? member?.profile?.email ?? 'Someone';
+        return getDisplayName(member?.profile?.display_name, member?.profile?.email, 'Someone');
     }, [item?.purchased_by, members]);
 
     if (!item) return null;

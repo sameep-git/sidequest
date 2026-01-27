@@ -3,6 +3,7 @@ import { useHouseholdStore } from '@/lib/household-store';
 import { shoppingService, transactionService } from '@/lib/services';
 import { locationService, type GroceryStore } from '@/lib/services/location-service';
 import type { ShoppingItem, Transaction, TransactionItem } from '@/lib/types';
+import { getDisplayName } from '@/lib/utils/display-name';
 import { formatDistanceToNow } from 'date-fns';
 import { useFocusEffect } from 'expo-router';
 import { DollarSign, Trophy, X } from 'lucide-react-native';
@@ -110,7 +111,7 @@ export function HomeTab({ houseName }: HomeTabProps) {
   const memberLookup = useMemo(() => {
     const lookup: Record<string, string> = {};
     members.forEach(({ member, profile }) => {
-      const name = profile?.display_name || profile?.email || 'Roommate';
+      const name = getDisplayName(profile?.display_name, profile?.email, 'Roommate');
       lookup[member.user_id] = name;
     });
     return lookup;

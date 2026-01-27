@@ -2,6 +2,7 @@ import { useSupabaseUser } from '@/hooks/use-supabase-user';
 import { useHouseholdStore } from '@/lib/household-store';
 import { debtService, transactionService } from '@/lib/services';
 import type { DebtLedger, Transaction } from '@/lib/types';
+import { getDisplayName } from '@/lib/utils/display-name';
 import { openVenmoPay, openVenmoRequest } from '@/lib/utils/venmo';
 import { useFocusEffect } from 'expo-router';
 import { DollarSign, Settings, ShoppingCart, UserPlus } from 'lucide-react-native';
@@ -37,7 +38,7 @@ export function ProfileTab() {
         return map;
       }
       const color = palette[index % palette.length];
-      const name = entry.profile?.display_name ?? entry.profile?.email ?? 'Roommate';
+      const name = getDisplayName(entry.profile?.display_name, entry.profile?.email, 'Roommate');
       map.set(id, { name, color, venmo: entry.profile?.venmo_handle ?? null });
       return map;
     }, new Map());
@@ -48,7 +49,7 @@ export function ProfileTab() {
     [members, user?.id]
   );
 
-  const displayName = currentMember?.profile?.display_name ?? user?.email ?? 'You';
+  const displayName = getDisplayName(currentMember?.profile?.display_name, user?.email, 'You');
   const initials = displayName.charAt(0).toUpperCase();
   const memberSince = currentMember?.member.joined_at
     ? new Date(currentMember.member.joined_at).toLocaleString('en-US', {

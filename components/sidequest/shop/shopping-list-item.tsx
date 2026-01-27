@@ -1,5 +1,6 @@
 import { useHouseholdStore } from '@/lib/household-store';
 import { ShoppingItem } from '@/lib/types';
+import { getDisplayName } from '@/lib/utils/display-name';
 import { Check, Flame, Info, Trash2 } from 'lucide-react-native';
 import { useMemo, useRef, useState } from 'react';
 import { Animated, Text, useColorScheme, View } from 'react-native';
@@ -24,7 +25,7 @@ export function ShoppingListItem({ item, onToggleComplete, onLongPress, onDelete
             return { initial: '?', color: '#888' };
         }
         const member = members.find(m => m.member.user_id === item.requested_by);
-        const name = member?.profile?.display_name ?? member?.profile?.email ?? 'Someone';
+        const name = getDisplayName(member?.profile?.display_name, member?.profile?.email, 'Someone');
         const initial = name.charAt(0).toUpperCase();
         // Theme-aware palette - first color uses emerald for light mode
         const accentGreen = isDark ? '#0F8' : '#059669';
