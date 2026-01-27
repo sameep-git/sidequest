@@ -1,7 +1,8 @@
 import { useSupabaseUser } from '@/hooks/use-supabase-user';
 import { householdService } from '@/lib/services';
+import { getPendingJoinCode } from '@/lib/utils/deep-link';
 import { Home, Plus } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, useColorScheme, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -17,9 +18,38 @@ export function HouseholdGate({ onContinue }: HouseholdGateProps) {
   const [houseCode, setHouseCode] = useState('');
   const [houseName, setHouseName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingDeepLink, setIsCheckingDeepLink] = useState(true);
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const accentGreen = isDark ? '#0F8' : '#059669';
+
+  // Check for pending join code from deep link
+  useEffect(() => {
+    const checkPendingCode = async () => {
+      if (!user) {
+        setIsCheckingDeepLink(false);
+        return;
+      }
+
+      const pendingCode = await getPendingJoinCode();
+      if (pendingCode) {
+        // Auto-join with the pending code
+        setIsLoading(true);
+        try {
+          const { household } = await householdService.joinByCode(pendingCode, user.id);
+          onContinue(household.id, household.name, household.join_code);
+          return;
+        } catch (err) {
+          Alert.alert('Failed to join', err instanceof Error ? err.message : 'Invalid invite link');
+        } finally {
+          setIsLoading(false);
+        }
+      }
+      setIsCheckingDeepLink(false);
+    };
+
+    checkPendingCode();
+  }, [user, onContinue]);
 
   const handleJoin = async () => {
     if (!user || houseCode.length !== 6) return;
@@ -48,6 +78,18 @@ export function HouseholdGate({ onContinue }: HouseholdGateProps) {
       setIsLoading(false);
     }
   };
+
+  // Show loading while checking for pending deep link code
+  if (isCheckingDeepLink || isLoading) {
+    return (
+      <SafeAreaView className="flex-1 items-center justify-center bg-white dark:bg-[#111]" edges={['top', 'bottom']}>
+        <ActivityIndicator size="large" color={accentGreen} />
+        <Text className="mt-4 text-gray-500 dark:text-gray-400">
+          {isLoading ? 'Joining household...' : 'Loading...'}
+        </Text>
+      </SafeAreaView>
+    );
+  }
 
   if (mode === 'choose') {
     return (

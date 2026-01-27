@@ -1,4 +1,5 @@
 import { useHouseholdStore } from '@/lib/household-store';
+import { getJoinDeepLink } from '@/lib/utils/deep-link';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { X } from 'lucide-react-native';
@@ -14,7 +15,8 @@ export function HouseholdInvite({ onClose }: HouseholdInviteProps) {
   const houseName = useHouseholdStore((state) => state.houseName);
   const joinCode = useHouseholdStore((state) => state.joinCode);
 
-  const inviteMessage = `Join "${houseName}" on sidequest! Use code: ${joinCode}`;
+  const deepLink = getJoinDeepLink(joinCode || '000000');
+  const inviteMessage = `Join "${houseName}" on Sidequest! 🏠\n\nTap to join: ${deepLink}\n\nOr enter code: ${joinCode}`;
 
   const handleShare = async () => {
     try {

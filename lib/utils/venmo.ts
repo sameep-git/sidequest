@@ -40,22 +40,23 @@ export function getVenmoDeepLink(options: VenmoDeepLinkOptions): string {
  * Open Venmo to pay a user
  */
 export async function openVenmoPay(recipient: string, amount: number, note?: string): Promise<boolean> {
-    const url = getVenmoDeepLink({ action: 'pay', recipient, amount, note });
+    const nativeUrl = getVenmoDeepLink({ action: 'pay', recipient, amount, note });
+    const cleanRecipient = recipient.replace(/^@/, '');
+    const webUrl = `https://venmo.com/?txn=pay&recipients=${cleanRecipient}&amount=${amount.toFixed(2)}&note=${encodeURIComponent(note || 'Sidequest payment')}`;
 
     try {
-        const canOpen = await Linking.canOpenURL(url);
-        if (canOpen) {
-            await Linking.openURL(url);
-            return true;
-        }
-
-        // Fallback to web if app not installed
-        const webUrl = `https://venmo.com/?txn=pay&recipients=${recipient.replace(/^@/, '')}&amount=${amount.toFixed(2)}&note=${encodeURIComponent(note || 'Sidequest payment')}`;
-        await Linking.openURL(webUrl);
+        // Try opening native app directly - don't rely on canOpenURL which requires LSApplicationQueriesSchemes
+        await Linking.openURL(nativeUrl);
         return true;
-    } catch (error) {
-        console.error('Failed to open Venmo:', error);
-        return false;
+    } catch {
+        // Native app failed, try web fallback
+        try {
+            await Linking.openURL(webUrl);
+            return true;
+        } catch (error) {
+            console.error('Failed to open Venmo:', error);
+            return false;
+        }
     }
 }
 
@@ -63,22 +64,23 @@ export async function openVenmoPay(recipient: string, amount: number, note?: str
  * Open Venmo to request money from a user
  */
 export async function openVenmoRequest(recipient: string, amount: number, note?: string): Promise<boolean> {
-    const url = getVenmoDeepLink({ action: 'charge', recipient, amount, note });
+    const nativeUrl = getVenmoDeepLink({ action: 'charge', recipient, amount, note });
+    const cleanRecipient = recipient.replace(/^@/, '');
+    const webUrl = `https://venmo.com/?txn=charge&recipients=${cleanRecipient}&amount=${amount.toFixed(2)}&note=${encodeURIComponent(note || 'Sidequest payment')}`;
 
     try {
-        const canOpen = await Linking.canOpenURL(url);
-        if (canOpen) {
-            await Linking.openURL(url);
-            return true;
-        }
-
-        // Fallback to web if app not installed
-        const webUrl = `https://venmo.com/?txn=charge&recipients=${recipient.replace(/^@/, '')}&amount=${amount.toFixed(2)}&note=${encodeURIComponent(note || 'Sidequest payment')}`;
-        await Linking.openURL(webUrl);
+        // Try opening native app directly - don't rely on canOpenURL which requires LSApplicationQueriesSchemes
+        await Linking.openURL(nativeUrl);
         return true;
-    } catch (error) {
-        console.error('Failed to open Venmo:', error);
-        return false;
+    } catch {
+        // Native app failed, try web fallback
+        try {
+            await Linking.openURL(webUrl);
+            return true;
+        } catch (error) {
+            console.error('Failed to open Venmo:', error);
+            return false;
+        }
     }
 }
 

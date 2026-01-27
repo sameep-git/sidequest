@@ -19,6 +19,7 @@ export default {
         NSCameraUsageDescription: 'sidequest needs camera access to scan receipts and automatically split items.',
         UIBackgroundModes: ['location'],
         ITSAppUsesNonExemptEncryption: false,
+        LSApplicationQueriesSchemes: ['venmo', 'maps', 'googlenavigation'],
       },
     },
     android: {
