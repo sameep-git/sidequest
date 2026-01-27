@@ -1,8 +1,9 @@
 import { useSupabaseUser } from '@/hooks/use-supabase-user';
 import { householdService } from '@/lib/services';
+import { getPendingJoinCode } from '@/lib/utils/deep-link';
 import { Home, Plus } from 'lucide-react-native';
-import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, useColorScheme, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type HouseholdGateProps = {
@@ -17,6 +18,38 @@ export function HouseholdGate({ onContinue }: HouseholdGateProps) {
   const [houseCode, setHouseCode] = useState('');
   const [houseName, setHouseName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingDeepLink, setIsCheckingDeepLink] = useState(true);
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const accentGreen = isDark ? '#0F8' : '#059669';
+
+  // Check for pending join code from deep link
+  useEffect(() => {
+    const checkPendingCode = async () => {
+      if (!user) {
+        setIsCheckingDeepLink(false);
+        return;
+      }
+
+      const pendingCode = await getPendingJoinCode();
+      if (pendingCode) {
+        // Auto-join with the pending code
+        setIsLoading(true);
+        try {
+          const { household } = await householdService.joinByCode(pendingCode, user.id);
+          onContinue(household.id, household.name, household.join_code);
+          return;
+        } catch (err) {
+          Alert.alert('Failed to join', err instanceof Error ? err.message : 'Invalid invite link');
+        } finally {
+          setIsLoading(false);
+        }
+      }
+      setIsCheckingDeepLink(false);
+    };
+
+    checkPendingCode();
+  }, [user, onContinue]);
 
   const handleJoin = async () => {
     if (!user || houseCode.length !== 6) return;
@@ -46,6 +79,18 @@ export function HouseholdGate({ onContinue }: HouseholdGateProps) {
     }
   };
 
+  // Show loading while checking for pending deep link code
+  if (isCheckingDeepLink || isLoading) {
+    return (
+      <SafeAreaView className="flex-1 items-center justify-center bg-white dark:bg-[#111]" edges={['top', 'bottom']}>
+        <ActivityIndicator size="large" color={accentGreen} />
+        <Text className="mt-4 text-gray-500 dark:text-gray-400">
+          {isLoading ? 'Joining household...' : 'Loading...'}
+        </Text>
+      </SafeAreaView>
+    );
+  }
+
   if (mode === 'choose') {
     return (
       <SafeAreaView className="flex-1 bg-white dark:bg-[#111]" edges={['top', 'bottom']}>
@@ -61,14 +106,17 @@ export function HouseholdGate({ onContinue }: HouseholdGateProps) {
             >
               <View className="flex-row items-center justify-between">
                 <View>
-                  <View className="mb-3 h-12 w-12 items-center justify-center rounded-2xl bg-[#0F8]/30">
-                    <Home size={20} color="#0F8" />
+                  <View
+                    className="mb-3 h-12 w-12 items-center justify-center rounded-2xl"
+                    style={{ backgroundColor: isDark ? 'rgba(0, 255, 136, 0.3)' : 'rgba(5, 150, 105, 0.2)' }}
+                  >
+                    <Home size={20} color={accentGreen} />
                   </View>
                   <Text className="text-xl font-semibold text-black dark:text-white">Join Existing House</Text>
                   <Text className="text-sm text-gray-500 dark:text-gray-400">Enter a 6-digit code</Text>
                 </View>
                 <View className="rounded-full bg-black/5 px-3 py-1 dark:bg-white/10">
-                  <Text className="text-xs text-[#0F8]">Join</Text>
+                  <Text style={{ color: accentGreen }} className="text-xs font-semibold">Join</Text>
                 </View>
               </View>
             </Pressable>
@@ -78,14 +126,17 @@ export function HouseholdGate({ onContinue }: HouseholdGateProps) {
             >
               <View className="flex-row items-center justify-between">
                 <View>
-                  <View className="mb-3 h-12 w-12 items-center justify-center rounded-2xl bg-[#0F8]/30">
-                    <Plus size={20} color="#0F8" />
+                  <View
+                    className="mb-3 h-12 w-12 items-center justify-center rounded-2xl"
+                    style={{ backgroundColor: isDark ? 'rgba(0, 255, 136, 0.3)' : 'rgba(5, 150, 105, 0.2)' }}
+                  >
+                    <Plus size={20} color={accentGreen} />
                   </View>
                   <Text className="text-xl font-semibold text-black dark:text-white">Create New House</Text>
                   <Text className="text-sm text-gray-500 dark:text-gray-400">Start fresh with roommates</Text>
                 </View>
                 <View className="rounded-full bg-black/5 px-3 py-1 dark:bg-white/10">
-                  <Text className="text-xs text-[#0F8]">Create</Text>
+                  <Text style={{ color: accentGreen }} className="text-xs font-semibold">Create</Text>
                 </View>
               </View>
             </Pressable>
@@ -99,7 +150,7 @@ export function HouseholdGate({ onContinue }: HouseholdGateProps) {
     <SafeAreaView className="flex-1 bg-white dark:bg-[#111]" edges={['top', 'bottom']}>
       <View className="flex-1 px-6 pt-6 pb-8">
         <Pressable onPress={() => setMode('choose')}>
-          <Text className="text-sm text-[#0F8]">← Back</Text>
+          <Text style={{ color: accentGreen }} className="text-sm font-medium">← Back</Text>
         </Pressable>
         <Text className="text-3xl font-bold text-black dark:text-white mt-4">
           {mode === 'join' ? 'Join House' : 'Create House'}
@@ -124,7 +175,8 @@ export function HouseholdGate({ onContinue }: HouseholdGateProps) {
         <Pressable
           onPress={mode === 'join' ? handleJoin : handleCreate}
           disabled={isLoading || (mode === 'join' ? houseCode.length !== 6 : !houseName.trim())}
-          className="mt-6 rounded-2xl bg-[#0F8] px-6 py-4 disabled:opacity-60"
+          style={{ backgroundColor: accentGreen }}
+          className="mt-6 rounded-2xl px-6 py-4 disabled:opacity-60"
         >
           {isLoading ? (
             <ActivityIndicator color="#000" />

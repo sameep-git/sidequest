@@ -22,6 +22,7 @@ interface ShoppingState {
     addItem: (item: ShoppingItem) => void;
     updateItem: (id: string, updates: Partial<ShoppingItem>) => void;
     removeItem: (id: string) => void;
+    replaceItem: (oldId: string, newItem: ShoppingItem) => void;
 
     // Offline queue actions
     queueAction: (action: Omit<OfflineAction, 'id' | 'timestamp'>) => void;
@@ -55,6 +56,13 @@ export const useShoppingStore = create<ShoppingState>()(
             removeItem: (id) =>
                 set((state) => ({
                     items: state.items.filter((item) => item.id !== id),
+                })),
+
+            replaceItem: (oldId, newItem) =>
+                set((state) => ({
+                    items: state.items.map((item) =>
+                        item.id === oldId ? newItem : item
+                    ),
                 })),
 
             queueAction: (action) =>

@@ -1,7 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Tabs } from 'expo-router';
 import { Icon, Label, NativeTabs, VectorIcon } from 'expo-router/unstable-native-tabs';
-import { Home, Plus, ShoppingCart, User } from 'lucide-react-native';
+import { Home, List, Store, Wallet } from 'lucide-react-native';
 import React from 'react';
 import { DynamicColorIOS, Platform } from 'react-native';
 
@@ -32,22 +32,22 @@ export default function TabLayout() {
         <Tabs.Screen
           name="shop"
           options={{
-            title: 'Shop',
-            tabBarIcon: ({ color, size }) => <ShoppingCart color={color} size={size ?? 24} />,
+            title: 'List',
+            tabBarIcon: ({ color, size }) => <List color={color} size={size ?? 24} />,
           }}
         />
         <Tabs.Screen
           name="scan"
           options={{
-            title: 'Add',
-            tabBarIcon: ({ color, size }) => <Plus color={color} size={size ?? 24} />,
+            title: 'Store',
+            tabBarIcon: ({ color, size }) => <Store color={color} size={size ?? 24} />,
           }}
         />
         <Tabs.Screen
           name="profile"
           options={{
-            title: 'Profile',
-            tabBarIcon: ({ color, size }) => <User color={color} size={size ?? 24} />,
+            title: 'Balances',
+            tabBarIcon: ({ color, size }) => <Wallet color={color} size={size ?? 24} />,
           }}
         />
       </Tabs>
@@ -78,26 +78,26 @@ export default function TabLayout() {
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="shop">
-        <Label>Shop</Label>
+        <Label>List</Label>
         {Platform.select({
-          ios: <Icon sf={{ default: 'cart', selected: 'cart.fill' }} />,
-          android: <Icon src={<VectorIcon family={MaterialIcons} name="shopping-cart" />} />,
+          ios: <Icon sf={{ default: 'list.bullet', selected: 'list.bullet' }} />,
+          android: <Icon src={<VectorIcon family={MaterialIcons} name="list" />} />,
         })}
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="scan">
-        <Label>Add</Label>
+        <Label>Store</Label>
         {Platform.select({
-          ios: <Icon sf={{ default: 'plus.circle', selected: 'plus.circle.fill' }} />,
-          android: <Icon src={<VectorIcon family={MaterialIcons} name="add-circle-outline" />} />,
+          ios: <Icon sf={{ default: 'storefront', selected: 'storefront.fill' }} />,
+          android: <Icon src={<VectorIcon family={MaterialIcons} name="store" />} />,
         })}
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="profile">
-        <Label>Profile</Label>
+        <Label>Balances</Label>
         {Platform.select({
-          ios: <Icon sf={{ default: 'person', selected: 'person.fill' }} />,
-          android: <Icon src={<VectorIcon family={MaterialIcons} name="person" />} />,
+          ios: <Icon sf={{ default: 'wallet.pass', selected: 'wallet.pass.fill' }} />,
+          android: <Icon src={<VectorIcon family={MaterialIcons} name="account-balance-wallet" />} />,
         })}
       </NativeTabs.Trigger>
     </NativeTabs>

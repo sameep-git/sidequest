@@ -3,7 +3,7 @@ import { useHouseholdStore } from '@/lib/household-store';
 import { householdService, userService } from '@/lib/services';
 import { useThemeStore } from '@/lib/theme-store';
 import { useRouter } from 'expo-router';
-import { ChevronRight, LogOut, Mail, Moon, Shield, Smartphone, Sun, User } from 'lucide-react-native';
+import { ChevronRight, DoorOpen, LogOut, Mail, Moon, Shield, Smartphone, Sun, User } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import { useState } from 'react';
 import { Alert, AlertButton, Pressable, Text, TextInput, View } from 'react-native';
@@ -87,6 +87,38 @@ export function SettingsScreen({ user, onClose }: SettingsScreenProps) {
         ];
 
         Alert.alert('Sign Out', 'Are you sure you want to sign out?', buttons);
+    };
+
+    const handleLeaveHousehold = async () => {
+        if (!householdId) return;
+
+        const buttons: AlertButton[] = [
+            { text: 'Cancel', style: 'cancel' },
+            {
+                text: 'Leave',
+                style: 'destructive',
+                onPress: async () => {
+                    try {
+                        await householdService.leave(householdId, user.id);
+                        onClose();
+                        resetHousehold();
+                        // Navigate back to root which will show join/create screen
+                        setTimeout(() => {
+                            router.replace('/');
+                        }, 100);
+                    } catch (e) {
+                        console.error('Leave household failed:', e);
+                        Alert.alert('Error', 'Failed to leave household. Please try again.');
+                    }
+                },
+            },
+        ];
+
+        Alert.alert(
+            'Leave Household',
+            'Are you sure you want to leave? You will need a new join code to rejoin this household.',
+            buttons
+        );
     };
 
     // Use inline styles for immediate theme reactivity
@@ -236,6 +268,17 @@ export function SettingsScreen({ user, onClose }: SettingsScreenProps) {
                         <ChevronRight size={18} color={isDark ? '#666' : '#9ca3af'} />
                     </Pressable>
                 </View>
+
+                {/* Leave Household Section */}
+                {householdId && (
+                    <Pressable
+                        onPress={handleLeaveHousehold}
+                        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(251, 146, 60, 0.4)', backgroundColor: 'rgba(251, 146, 60, 0.1)', paddingVertical: 16, marginBottom: 12 }}
+                    >
+                        <DoorOpen size={18} color="#fb923c" />
+                        <Text style={{ marginLeft: 8, fontWeight: '600', color: '#fb923c' }}>Leave Household</Text>
+                    </Pressable>
+                )}
 
                 {/* Logout Section */}
                 <Pressable

@@ -1,4 +1,5 @@
 import { AddItemModal } from '@/components/sidequest/shop/add-item-modal';
+import { ItemDetailsSheet } from '@/components/sidequest/shop/item-details-sheet';
 import { ShoppingListItem } from '@/components/sidequest/shop/shopping-list-item';
 import { Button } from '@/components/ui/button';
 import { useNetworkStatus } from '@/hooks/use-network-status';
@@ -29,6 +30,7 @@ export function ShopTab() {
   const tabBarClearance = Platform.OS !== 'ios' || (iosMajorVersion != null && iosMajorVersion >= 26) ? 88 : 0;
 
   const householdId = useHouseholdStore((state) => state.householdId);
+  const members = useHouseholdStore((state) => state.members);
   const { user } = useSupabaseUser();
   const { isOffline } = useNetworkStatus();
 
@@ -38,6 +40,7 @@ export function ShopTab() {
   const addStoreItem = useShoppingStore((state) => state.addItem);
   const updateStoreItem = useShoppingStore((state) => state.updateItem);
   const removeStoreItem = useShoppingStore((state) => state.removeItem);
+  const replaceStoreItem = useShoppingStore((state) => state.replaceItem);
   const queueAction = useShoppingStore((state) => state.queueAction);
   const syncOfflineActions = useShoppingStore((state) => state.syncOfflineActions);
   const offlineQueue = useShoppingStore((state) => state.offlineQueue);
@@ -47,6 +50,7 @@ export function ShopTab() {
   const [primaryCtaHeight, setPrimaryCtaHeight] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [detailItem, setDetailItem] = useState<ShoppingItem | null>(null);
   const deletedItemIds = useRef<Set<string>>(new Set());
 
   const remainingItems = useMemo(
@@ -206,20 +210,23 @@ export function ShopTab() {
 
         // Notify household if bounty added
         if (bounty && user) {
+          // Get display name from members store (not auth metadata)
+          const currentUserProfile = members.find(m => m.member.user_id === user.id);
+          const displayName = currentUserProfile?.profile?.display_name || 'Roommate';
+
           import('@/lib/services/push-service').then(({ pushService }) => {
             pushService.notifyBountyAdded(
               householdId,
               user.id,
-              user.user_metadata?.display_name || 'Roommate',
+              displayName,
               name,
               bounty
             );
           });
         }
 
-        // Replace temp item with real one
-        removeStoreItem(tempId);
-        addStoreItem(created);
+        // Replace temp item with real one atomically (no flicker)
+        replaceStoreItem(tempId, created);
       } catch (err) {
         removeStoreItem(tempId);
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -247,7 +254,7 @@ export function ShopTab() {
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-white dark:bg-[#222]">
-      <View className="px-6 pb-4 pt-5 border-b border-gray-200 dark:border-[#333]">
+      <View className="px-6 pb-3 pt-4 border-b border-gray-200 dark:border-[#333]">
         <View className="flex-row items-center justify-between">
           <Text className="text-3xl font-semibold text-black dark:text-white">Shopping List</Text>
           {isOffline && (
@@ -257,18 +264,19 @@ export function ShopTab() {
             </View>
           )}
         </View>
-        <Text className="mt-1 text-sm" style={{ color: '#888' }}>
-          {remainingItems.length} items to buy
-          {offlineQueue.length > 0 && ` • ${offlineQueue.length} pending sync`}
-        </Text>
-        <Button
-          onPress={() => setShowAddModal(true)}
-          size="sm"
-          className="mt-4"
-        >
-          <Plus size={18} className="text-white dark:text-black" />
-          <Text className="ml-2 font-semibold text-white dark:text-black">Add</Text>
-        </Button>
+        <View className="mt-2 flex-row items-center justify-between">
+          <Text className="text-sm" style={{ color: '#888' }}>
+            {remainingItems.length} items to buy
+            {offlineQueue.length > 0 && ` • ${offlineQueue.length} pending sync`}
+          </Text>
+          <Button
+            onPress={() => setShowAddModal(true)}
+            size="sm"
+          >
+            <Plus size={18} className="text-white dark:text-black" />
+            <Text className="ml-2 font-semibold text-white dark:text-black">Add</Text>
+          </Button>
+        </View>
       </View>
 
       {isLoading && storeItems.length === 0 ? (
@@ -303,6 +311,7 @@ export function ShopTab() {
             <ShoppingListItem
               item={item}
               onToggleComplete={handleToggleComplete}
+              onLongPress={setDetailItem}
               onDelete={handleDelete}
             />
           )}
@@ -340,6 +349,13 @@ export function ShopTab() {
         visible={showAddModal}
         onClose={() => setShowAddModal(false)}
         onAdd={handleAddItem}
+      />
+
+      <ItemDetailsSheet
+        item={detailItem}
+        onClose={() => setDetailItem(null)}
+        onToggleComplete={handleToggleComplete}
+        onDelete={handleDelete}
       />
     </SafeAreaView>
   );

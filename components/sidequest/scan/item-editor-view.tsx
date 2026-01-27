@@ -2,7 +2,7 @@ import { ShoppingItem } from '@/lib/types';
 import { ReceiptItem } from '@/lib/utils/receipt-parser';
 import { User } from '@supabase/supabase-js';
 import { Camera as CameraIcon, Check, Plus, Trash2 } from 'lucide-react-native';
-import { FlatList, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { FlatList, Modal, Pressable, ScrollView, Text, TextInput, useColorScheme, View } from 'react-native';
 import { EdgeInsets, SafeAreaView } from 'react-native-safe-area-context';
 
 type Roommate = {
@@ -88,6 +88,10 @@ export function ItemEditorView({
     onConfirmPost,
     onCancelPost,
 }: ItemEditorViewProps) {
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
+    // Theme-aware accent color (visible in both modes)
+    const accentGreen = isDark ? '#0F8' : '#059669';
 
     const allItemsAssigned = receiptItems.every(
         (item) => item.splitType === 'split' || item.splitType === 'custom' || Boolean(item.assignedToUserId)
@@ -196,7 +200,7 @@ export function ItemEditorView({
                                                 </Text>
                                                 {item.bounty_amount ? (
                                                     <Text className="ml-1 text-xs font-bold text-orange-500 dark:text-[#f59e0b]">
-                                                        +${item.bounty_amount.toFixed(0)}
+                                                        +${item.bounty_amount.toFixed(2)}
                                                     </Text>
                                                 ) : null}
                                             </Pressable>
@@ -221,19 +225,18 @@ export function ItemEditorView({
                             key={item.id}
                             accessibilityRole="button"
                             onPress={() => onSelect(item.id)}
-                            className={`mb-3 rounded-2xl border-2 px-4 py-4 ${isSelected
-                                ? 'border-[#0F8] bg-[#0F8]/10 dark:bg-[#0F8]/20'
-                                : isAssigned
-                                    ? isSplit
-                                        ? 'border-violet-500 bg-violet-50 dark:bg-violet-500/10'
-                                        : 'border-[#0F8] bg-[#0F8]/10 dark:bg-[#0F8]/15'
-                                    : 'border-gray-200 bg-white dark:border-[#333] dark:bg-[#2a2a2a]'
-                                }`}
+                            style={isSelected ? {
+                                marginBottom: 12,
+                                borderRadius: 16,
+                                borderWidth: 2,
+                                borderColor: accentGreen,
+                                backgroundColor: isDark ? 'rgba(0, 255, 136, 0.2)' : 'rgba(5, 150, 105, 0.1)',
+                                paddingHorizontal: 16,
+                                paddingVertical: 16,
+                            } : undefined}
+                            className={!isSelected ? 'mb-3 rounded-2xl border-2 px-4 py-4 border-gray-200 bg-white dark:border-[#333] dark:bg-[#2a2a2a]' : ''}
                         >
-                            <View className="mb-2 flex-row items-center justify-between">
-                                <Text className="text-xs uppercase text-gray-400 dark:text-white/50">Item Name</Text>
-                                <Text className="text-xs uppercase text-gray-400 dark:text-white/50">Price</Text>
-                            </View>
+
                             <View className="flex-row items-center gap-2">
                                 <TextInput
                                     className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 font-semibold text-black dark:border-[#444] dark:bg-[#1a1a1a] dark:text-white"
@@ -271,7 +274,7 @@ export function ItemEditorView({
                                                 ? '#8b5cf6'
                                                 : item.splitType === 'custom'
                                                     ? '#f97316'
-                                                    : '#0F8'
+                                                    : accentGreen
                                         }}
                                     />
                                     <Text
@@ -281,7 +284,7 @@ export function ItemEditorView({
                                                 ? '#8b5cf6'
                                                 : item.splitType === 'custom'
                                                     ? '#f97316'
-                                                    : '#0F8'
+                                                    : accentGreen
                                         }}
                                     >
                                         {item.assignedToName}
@@ -312,7 +315,10 @@ export function ItemEditorView({
             />
 
             {selectedItem !== null && (
-                <View className="border-t border-gray-200 px-6 py-4 dark:border-[#333]">
+                <View
+                    className="border-t border-gray-200 px-6 py-4 dark:border-[#333]"
+                    style={{ paddingBottom: insets.bottom + tabBarClearance + 16 }}
+                >
                     <Text className="mb-3 text-sm text-gray-500 dark:text-white/70">Assign to:</Text>
 
                     <View className="mb-4 flex-row flex-wrap gap-2">
@@ -369,19 +375,22 @@ export function ItemEditorView({
                 </View>
             )}
 
-            <View className="px-6" style={{ paddingBottom: insets.bottom + tabBarClearance }}>
-                <Pressable
-                    accessibilityRole="button"
-                    className="items-center justify-center rounded-2xl py-4 bg-emerald-500 dark:bg-[#0F8]"
-                    style={{
-                        opacity: !receiptItems.length || !allItemsAssigned || isPosting ? 0.4 : 1,
-                    }}
-                    onPress={onPost}
-                    disabled={!receiptItems.length || !allItemsAssigned || isPosting}
-                >
-                    <Text className="font-semibold text-white dark:text-black">{isPosting ? 'Posting...' : 'Post to House'}</Text>
-                </Pressable>
-            </View>
+            {/* Post button only shows when splitter is closed */}
+            {selectedItem === null && (
+                <View className="px-6" style={{ paddingBottom: insets.bottom + tabBarClearance }}>
+                    <Pressable
+                        accessibilityRole="button"
+                        className="items-center justify-center rounded-2xl py-4 bg-emerald-500 dark:bg-[#0F8]"
+                        style={{
+                            opacity: !receiptItems.length || !allItemsAssigned || isPosting ? 0.4 : 1,
+                        }}
+                        onPress={onPost}
+                        disabled={!receiptItems.length || !allItemsAssigned || isPosting}
+                    >
+                        <Text className="font-semibold text-white dark:text-black">{isPosting ? 'Posting...' : 'Post to House'}</Text>
+                    </Pressable>
+                </View>
+            )}
 
             {/* Shopping List Match Confirmation Modal */}
             <Modal

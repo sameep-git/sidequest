@@ -11,7 +11,7 @@ export default {
     ios: {
       bundleIdentifier: 'com.sameepshah.sidequest',
       supportsTablet: true,
-      buildNumber: '2',
+      buildNumber: '3',
       infoPlist: {
         NSLocationWhenInUseUsageDescription: 'sidequest needs your location to notify you when you\'re near stores with active bounties.',
         NSLocationAlwaysAndWhenInUseUsageDescription: 'sidequest needs your location always to send you notifications about nearby stores, even when the app is in the background.',
@@ -19,6 +19,7 @@ export default {
         NSCameraUsageDescription: 'sidequest needs camera access to scan receipts and automatically split items.',
         UIBackgroundModes: ['location'],
         ITSAppUsesNonExemptEncryption: false,
+        LSApplicationQueriesSchemes: ['venmo', 'maps', 'googlenavigation'],
       },
     },
     android: {

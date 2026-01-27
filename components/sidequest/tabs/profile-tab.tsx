@@ -2,9 +2,10 @@ import { useSupabaseUser } from '@/hooks/use-supabase-user';
 import { useHouseholdStore } from '@/lib/household-store';
 import { debtService, transactionService } from '@/lib/services';
 import type { DebtLedger, Transaction } from '@/lib/types';
+import { getDisplayName } from '@/lib/utils/display-name';
 import { openVenmoPay, openVenmoRequest } from '@/lib/utils/venmo';
 import { useFocusEffect } from 'expo-router';
-import { DollarSign, Settings, ShoppingCart, Star, Trophy, UserPlus } from 'lucide-react-native';
+import { DollarSign, Settings, ShoppingCart, UserPlus } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
@@ -28,14 +29,16 @@ export function ProfileTab() {
   const [showSettings, setShowSettings] = useState(false);
 
   const memberLookup = useMemo(() => {
-    const palette = ['#0F8', '#8b5cf6', '#3b82f6', '#f97316', '#ec4899'];
+    const isDark = colorScheme === 'dark';
+    const accentGreen = isDark ? '#0F8' : '#059669';
+    const palette = [accentGreen, '#8b5cf6', '#3b82f6', '#f97316', '#ec4899'];
     return members.reduce<Map<string, { name: string; color: string; venmo: string | null }>>((map, entry, index) => {
       const id = entry.profile?.id ?? entry.member.user_id;
       if (!id) {
         return map;
       }
       const color = palette[index % palette.length];
-      const name = entry.profile?.display_name ?? entry.profile?.email ?? 'Roommate';
+      const name = getDisplayName(entry.profile?.display_name, entry.profile?.email, 'Roommate');
       map.set(id, { name, color, venmo: entry.profile?.venmo_handle ?? null });
       return map;
     }, new Map());
@@ -46,7 +49,7 @@ export function ProfileTab() {
     [members, user?.id]
   );
 
-  const displayName = currentMember?.profile?.display_name ?? user?.email ?? 'You';
+  const displayName = getDisplayName(currentMember?.profile?.display_name, user?.email, 'You');
   const initials = displayName.charAt(0).toUpperCase();
   const memberSince = currentMember?.member.joined_at
     ? new Date(currentMember.member.joined_at).toLocaleString('en-US', {
@@ -94,6 +97,36 @@ export function ProfileTab() {
     }, [fetchData])
   );
 
+  // Calculate NET balance per roommate
+  // Positive = they owe you, Negative = you owe them
+  const netBalances = useMemo(() => {
+    if (!user) return [];
+
+    const balanceMap = new Map<string, number>();
+
+    debts.forEach((debt) => {
+      if (debt.is_settled) return;
+
+      if (debt.lender_id === user.id) {
+        // They owe me (borrower owes me)
+        const current = balanceMap.get(debt.borrower_id) || 0;
+        balanceMap.set(debt.borrower_id, current + debt.amount);
+      } else if (debt.borrower_id === user.id) {
+        // I owe them (lender is owed by me)
+        const current = balanceMap.get(debt.lender_id) || 0;
+        balanceMap.set(debt.lender_id, current - debt.amount);
+      }
+    });
+
+    return Array.from(balanceMap.entries())
+      .filter(([_, net]) => Math.abs(net) > 0.01) // Filter out zero balances
+      .map(([personId, netAmount]) => ({
+        personId,
+        netAmount, // positive = they owe me, negative = I owe them
+      }));
+  }, [debts, user]);
+
+  // Keep legacy calculations for the stats cards
   const debtsYouOwe = useMemo(
     () => {
       if (!user) return [];
@@ -146,8 +179,6 @@ export function ProfileTab() {
   const stats = [
     { label: 'Trips Logged', value: String(tripsLogged), Icon: ShoppingCart, color: colorScheme === 'dark' ? '#0F8' : '#059669' },
     { label: 'Total Spent', value: `$${totalSpent.toFixed(0)}`, Icon: DollarSign, color: colorScheme === 'dark' ? '#0F8' : '#059669' },
-    { label: 'You Are Owed', value: `$${amountOwedToYou.toFixed(2)}`, Icon: Trophy, color: '#facc15' },
-    { label: 'You Owe', value: `$${amountYouOwe.toFixed(2)}`, Icon: Star, color: '#8b5cf6' },
   ];
 
   const handlePayWithVenmo = async (lenderId: string, amount: number) => {
@@ -236,7 +267,7 @@ export function ProfileTab() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor="#0F8"
+            tintColor={colorScheme === 'dark' ? '#0F8' : '#059669'}
           />
         }
       >
@@ -279,7 +310,14 @@ export function ProfileTab() {
               key={item.label}
               className="mb-3 w-[48%] rounded-2xl border p-4 bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-[#333]"
             >
-              <View className="mb-3 h-12 w-12 items-center justify-center rounded-xl" style={{ backgroundColor: `${item.color}33` }}>
+              <View
+                className="mb-3 h-12 w-12 items-center justify-center rounded-xl"
+                style={{
+                  backgroundColor: colorScheme === 'dark'
+                    ? 'rgba(0, 255, 136, 0.15)'
+                    : 'rgba(5, 150, 105, 0.1)'
+                }}
+              >
                 <item.Icon size={24} color={item.color} />
               </View>
               <Text className="text-xl font-semibold text-black dark:text-white">{item.value}</Text>
@@ -413,43 +451,85 @@ export function ProfileTab() {
           </View>
         )}
 
-        {debtsYouOwe.length > 0 && (
+        {/* Unified Balances Section */}
+        {netBalances.length > 0 && (
           <View className="mb-4 px-6">
             <Text className="mb-3 text-sm text-gray-500 dark:text-[#888]">
-              You Owe
+              Balances
             </Text>
             <View className="gap-3">
-              {debtsYouOwe.map((debt) => {
-                const lender = memberLookup.get(debt.lender_id);
-                const lenderName = lender?.name ?? 'Roommate';
+              {netBalances.map(({ personId, netAmount }) => {
+                const person = memberLookup.get(personId);
+                const personName = person?.name ?? 'Roommate';
+                const theyOweMe = netAmount > 0;
+                const absAmount = Math.abs(netAmount);
+
                 return (
                   <View
-                    key={debt.id}
+                    key={personId}
                     className="rounded-2xl border p-4 bg-white dark:bg-[#2a2a2a] border-gray-200 dark:border-[#333]"
                   >
                     <View className="mb-3 flex-row items-center">
                       <View
                         className="mr-3 h-11 w-11 items-center justify-center rounded-full"
-                        style={{ backgroundColor: lender?.color ?? '#0F8' }}
+                        style={{ backgroundColor: person?.color ?? '#0F8' }}
                       >
-                        <Text className="text-base font-semibold text-white">{lenderName.charAt(0)}</Text>
+                        <Text className="text-base font-semibold text-white">{personName.charAt(0)}</Text>
                       </View>
                       <View>
-                        <Text className="font-semibold text-black dark:text-white">You owe {lenderName}</Text>
-                        <Text className="mt-1 text-2xl font-semibold text-black dark:text-white">${debt.amount.toFixed(2)}</Text>
+                        <Text className="font-semibold text-black dark:text-white">
+                          {theyOweMe ? `${personName} owes you` : `You owe ${personName}`}
+                        </Text>
+                        <Text
+                          className="mt-1 text-2xl font-semibold"
+                          style={{ color: theyOweMe ? (colorScheme === 'dark' ? '#0F8' : '#059669') : '#f97316' }}
+                        >
+                          ${absAmount.toFixed(2)}
+                        </Text>
                       </View>
                     </View>
+
+                    {/* Show Pay OR Request based on net balance */}
+                    {theyOweMe ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={() => handleRequestWithVenmo(personId, absAmount)}
+                        style={{
+                          backgroundColor: '#008CFF',
+                          borderRadius: 16,
+                          paddingVertical: 12,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: '600' }}>Request on Venmo</Text>
+                      </Pressable>
+                    ) : (
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={() => handlePayWithVenmo(personId, absAmount)}
+                        style={{
+                          backgroundColor: '#008CFF',
+                          borderRadius: 16,
+                          paddingVertical: 12,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: '600' }}>Pay with Venmo</Text>
+                      </Pressable>
+                    )}
+
                     <Pressable
                       accessibilityRole="button"
-                      onPress={() => handlePayWithVenmo(debt.lender_id, debt.amount)}
-                      className="items-center justify-center rounded-2xl py-3"
-                      style={({ pressed }) => ({ backgroundColor: '#008CFF', opacity: pressed ? 0.7 : 1 })}
-                    >
-                      <Text className="font-semibold text-white">Pay with Venmo</Text>
-                    </Pressable>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => handleSettleDebt(debt.borrower_id, debt.lender_id, lenderName)}
+                      onPress={() => {
+                        // For settle, we need both borrower and lender
+                        // If they owe me: borrower = personId, lender = me
+                        // If I owe them: borrower = me, lender = personId
+                        const borrowerId = theyOweMe ? personId : user!.id;
+                        const lenderId = theyOweMe ? user!.id : personId;
+                        handleSettleDebt(borrowerId, lenderId, personName);
+                      }}
                       className="mt-2 items-center justify-center rounded-2xl py-2 bg-gray-100 dark:bg-[#333]"
                     >
                       <Text className="text-sm font-semibold text-emerald-600 dark:text-[#0F8]">Mark as All Settled</Text>
@@ -461,61 +541,7 @@ export function ProfileTab() {
           </View>
         )}
 
-        {debtsOwedToYou.length > 0 && (
-          <View className="mb-4 px-6">
-            <Text className="mb-3 text-sm text-gray-500 dark:text-[#888]">
-              You&apos;re Owed
-            </Text>
-            <View className="gap-3">
-              {debtsOwedToYou.map((debt) => {
-                const borrower = memberLookup.get(debt.borrower_id);
-                const borrowerName = borrower?.name ?? 'Roommate';
-                return (
-                  <View
-                    key={debt.id}
-                    className="rounded-2xl border p-4 bg-white dark:bg-[#1f1f1f] border-gray-200 dark:border-[#333]"
-                  >
-                    <View className="mb-3 flex-row items-center">
-                      <View
-                        className="mr-3 h-11 w-11 items-center justify-center rounded-full"
-                        style={{ backgroundColor: borrower?.color ?? '#0F8' }}
-                      >
-                        <Text className="text-base font-semibold text-white">{borrowerName.charAt(0)}</Text>
-                      </View>
-                      <View>
-                        <Text className="font-semibold text-black dark:text-white">{borrowerName} owes you</Text>
-                        <Text className="mt-1 text-2xl font-semibold text-emerald-600 dark:text-[#0F8]">
-                          ${debt.amount.toFixed(2)}
-                        </Text>
-                      </View>
-                    </View>
-                    <View className="flex-row items-center justify-between">
-                      <Text className="text-xs" style={{ color: '#777' }}>
-                        Pending
-                      </Text>
-                      <Pressable
-                        accessibilityRole="button"
-                        onPress={() => handleRequestWithVenmo(debt.borrower_id, debt.amount)}
-                        className="rounded-full px-3 py-1 bg-gray-100 dark:bg-[#333]"
-                      >
-                        <Text className="text-xs font-semibold text-black dark:text-white">Request</Text>
-                      </Pressable>
-                      <Pressable
-                        accessibilityRole="button"
-                        onPress={() => handleSettleDebt(debt.borrower_id, debt.lender_id, borrowerName)}
-                        className="ml-2 rounded-full px-3 py-1 bg-emerald-500 dark:bg-[#0F8]"
-                      >
-                        <Text className="text-xs font-semibold text-white dark:text-black">Settled</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-        )}
-
-        {!debtsYouOwe.length && !debtsOwedToYou.length && !isLoading && (
+        {netBalances.length === 0 && !isLoading && (
           <View className="px-6">
             <View className="items-center rounded-2xl border p-6 bg-white dark:bg-[#2a2a2a] border-gray-200 dark:border-[#333]">
               <Text className="text-5xl">💳</Text>
