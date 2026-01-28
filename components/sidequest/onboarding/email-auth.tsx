@@ -31,9 +31,7 @@ export function EmailAuth({ onSuccess, onBack }: EmailAuthProps) {
       setIsLoading(true);
       if (isSignUp) {
         await authService.signUpWithEmail(email, password, displayName);
-        // Alert.alert('Success', 'Check your email to verify your account', [
-        //   { text: 'OK', onPress: onSuccess },
-        // ]);
+        onSuccess();
       } else {
         await authService.signInWithEmail(email, password);
         onSuccess();

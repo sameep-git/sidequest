@@ -12,7 +12,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HouseholdInvite } from '../household-invite';
-import { SettingsScreen } from '../settings-screen';
+import { SettingsScreen } from '../SettingsScreen';
 
 
 export function ProfileTab() {

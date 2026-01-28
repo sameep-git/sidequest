@@ -88,7 +88,7 @@ export default function IndexScreen() {
                       setHasCheckedHousehold(false);
                       setPhase('loading');
                       checkStatus();
-                    } catch (e) {
+                    } catch {
                       Alert.alert('Error', 'Failed to leave household');
                       proceedWithHousehold(result);
                     }

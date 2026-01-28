@@ -3,10 +3,11 @@ import { useHouseholdStore } from '@/lib/household-store';
 import { householdService, userService } from '@/lib/services';
 import { useThemeStore } from '@/lib/theme-store';
 import { useRouter } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { ChevronRight, DoorOpen, LogOut, Mail, Moon, Shield, Smartphone, Sun, User } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import { useState } from 'react';
-import { Alert, AlertButton, Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, AlertButton, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type SettingsScreenProps = {
@@ -121,6 +122,40 @@ export function SettingsScreen({ user, onClose }: SettingsScreenProps) {
         );
     };
 
+    const handleDeleteAccount = async () => {
+        Alert.alert(
+            'Delete Account',
+            'Are you sure you want to delete your account? This action cannot be undone and will permanently delete your data.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            // Attempt to delete user data
+                            await userService.delete(user.id);
+                            
+                            // Sign out regardless of data deletion success to ensure safety
+                            await authService.signOut();
+                            onClose();
+                            resetHousehold();
+                            router.replace('/');
+                        } catch (e) {
+                            console.error('Delete account failed:', e);
+                            // Even if it fails, we should probably sign them out or tell them to contact support
+                            Alert.alert(
+                                'Error', 
+                                'Failed to complete account deletion. Please contact support at sameepshah384@gmail.com',
+                                [{ text: 'OK', onPress: () => authService.signOut().then(() => router.replace('/')) }]
+                            );
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     // Use inline styles for immediate theme reactivity
     const bgColor = isDark ? '#222' : '#f2f2f2';
     const cardBg = isDark ? '#2a2a2a' : '#fff';
@@ -128,6 +163,19 @@ export function SettingsScreen({ user, onClose }: SettingsScreenProps) {
     const textColor = isDark ? '#fff' : '#000';
     const mutedText = isDark ? '#888' : '#6b7280';
     const accentColor = isDark ? '#0F8' : '#059669';
+
+    const openUrl = async (url: string) => {
+        try {
+            const supported = await Linking.canOpenURL(url);
+            if (supported) {
+                await Linking.openURL(url);
+            } else {
+                Alert.alert('Error', `Cannot open URL: ${url}`);
+            }
+        } catch {
+            Alert.alert('Error', 'Failed to open link');
+        }
+    };
 
     return (
         <View style={{ flex: 1, backgroundColor: bgColor, paddingTop: insets.top }}>
@@ -153,8 +201,8 @@ export function SettingsScreen({ user, onClose }: SettingsScreenProps) {
                 <View style={{ width: 48 }} />
             </View>
 
-            <View style={{ flex: 1, paddingHorizontal: 24, paddingTop: 24 }}>
-                {/* Profile Section */}
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 24, paddingBottom: 40 }}>
+                {/* Profile Section Settings */}
                 <Text style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: mutedText, marginBottom: 12 }}>Profile</Text>
                 <View style={{ borderRadius: 16, borderWidth: 1, backgroundColor: cardBg, borderColor, marginBottom: 24 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: borderColor }}>
@@ -248,7 +296,7 @@ export function SettingsScreen({ user, onClose }: SettingsScreenProps) {
                 <Text style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: mutedText, marginBottom: 12 }}>Legal</Text>
                 <View style={{ borderRadius: 16, borderWidth: 1, backgroundColor: cardBg, borderColor, marginBottom: 24 }}>
                     <Pressable
-                        onPress={() => Alert.alert('Privacy Policy', 'This would open the privacy policy.')}
+                        onPress={() => openUrl('https://sameepshah.com/sidequest/privacy')}
                         style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: borderColor }}
                     >
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -258,7 +306,17 @@ export function SettingsScreen({ user, onClose }: SettingsScreenProps) {
                         <ChevronRight size={18} color={isDark ? '#666' : '#9ca3af'} />
                     </Pressable>
                     <Pressable
-                        onPress={() => Alert.alert('Terms of Service', 'This would open the terms of service.')}
+                        onPress={() => openUrl('https://sameepshah.com/sidequest')}
+                        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: borderColor }}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Shield size={18} color={mutedText} />
+                            <Text style={{ marginLeft: 12, color: textColor, fontSize: 16 }}>Support</Text>
+                        </View>
+                        <ChevronRight size={18} color={isDark ? '#666' : '#9ca3af'} />
+                    </Pressable>
+                    <Pressable
+                        onPress={() => Alert.alert('Terms of Service', 'Terms are currently standard app license agreement.')}
                         style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 }}
                     >
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -283,17 +341,28 @@ export function SettingsScreen({ user, onClose }: SettingsScreenProps) {
                 {/* Logout Section */}
                 <Pressable
                     onPress={handleLogout}
-                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.4)', backgroundColor: 'rgba(239, 68, 68, 0.1)', paddingVertical: 16 }}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.4)', backgroundColor: 'rgba(239, 68, 68, 0.1)', paddingVertical: 16, marginBottom: 24 }}
                 >
                     <LogOut size={18} color="#ef4444" />
                     <Text style={{ marginLeft: 8, fontWeight: '600', color: '#f87171' }}>Sign Out</Text>
                 </Pressable>
 
+                {/* Danger Zone */}
+                <View style={{ marginTop: 8, marginBottom: 8 }}>
+                    <Text style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: mutedText, marginBottom: 12, textAlign: 'center' }}>Danger Zone</Text>
+                    <Pressable
+                        onPress={handleDeleteAccount}
+                        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12 }}
+                    >
+                        <Text style={{ fontSize: 14, fontWeight: '500', color: '#ef4444', textDecorationLine: 'underline' }}>Delete Account</Text>
+                    </Pressable>
+                </View>
+
                 {/* App Version */}
-                <Text style={{ textAlign: 'center', fontSize: 12, color: '#666', marginTop: 24 }}>
+                <Text style={{ textAlign: 'center', fontSize: 12, color: '#666', marginTop: 8 }}>
                     sidequest v1.0.0
                 </Text>
-            </View>
+            </ScrollView>
         </View>
     );
 }
