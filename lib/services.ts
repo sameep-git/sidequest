@@ -19,17 +19,39 @@ export const householdService = {
     name: string,
     creatorUserId: string
   ): Promise<{ household: Household; membership: HouseholdMember }> {
-    // Generate a 6-digit join code
-    const joinCode = Math.floor(100000 + Math.random() * 900000).toString();
+    let household: Household | null = null;
+    let householdError: any = null;
+    let attempts = 0;
+    const maxAttempts = 3;
 
-    // Create household
-    const { data: household, error: householdError } = await supabase
-      .from('households')
-      .insert({ name, join_code: joinCode })
-      .select()
-      .single();
+    // Retry loop for join code collision
+    while (attempts < maxAttempts && !household) {
+      // Generate a 6-digit join code
+      const joinCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+      try {
+        const { data, error } = await supabase
+          .from('households')
+          .insert({ name, join_code: joinCode })
+          .select()
+          .single();
+
+        if (error) {
+          if (error.code === '23505') { // Unique violation
+            attempts++;
+            continue;
+          }
+          throw error;
+        }
+        household = data;
+      } catch (err) {
+        householdError = err;
+        break; // Non-collision error, stop retrying
+      }
+    }
 
     if (householdError) throw householdError;
+    if (!household) throw new Error('Failed to create household after multiple attempts');
 
     // Add creator as admin
     const { data: membership, error: memberError } = await supabase
@@ -281,6 +303,20 @@ export const transactionService = {
     if (error) throw error;
     return data || [];
   },
+
+  async delete(id: string): Promise<void> {
+    // Manual cascade delete because Supabase foreign keys might not be set to CASCADE
+
+    // 1. Delete associated debts (ignore error if none exist)
+    await supabase.from('debt_ledger').delete().eq('transaction_id', id);
+
+    // 2. Delete associated items (ignore error if none exist)
+    await supabase.from('transaction_items').delete().eq('transaction_id', id);
+
+    // 3. Delete the transaction itself
+    const { error } = await supabase.from('transactions').delete().eq('id', id);
+    if (error) throw error;
+  },
 };
 
 export const userService = {
@@ -307,6 +343,15 @@ export const userService = {
       throw error;
     }
     return data;
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
   },
 };
 

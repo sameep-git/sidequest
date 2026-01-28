@@ -1,0 +1,6 @@
+{
+  "name": "receipt-processor",
+  "version": "1.0.0",
+  "description": "On-device receipt processing using Apple Vision and Foundation Models",
+  "main": "index.ts"
+}

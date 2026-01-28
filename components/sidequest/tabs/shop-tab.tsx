@@ -2,6 +2,7 @@ import { AddItemModal } from '@/components/sidequest/shop/add-item-modal';
 import { ItemDetailsSheet } from '@/components/sidequest/shop/item-details-sheet';
 import { ShoppingListItem } from '@/components/sidequest/shop/shopping-list-item';
 import { Button } from '@/components/ui/button';
+import { SkeletonCard } from '@/components/ui/skeleton';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { useSupabaseUser } from '@/hooks/use-supabase-user';
 import { useHouseholdStore } from '@/lib/household-store';
@@ -9,7 +10,7 @@ import { shoppingService } from '@/lib/services';
 import { useShoppingStore } from '@/lib/shopping-store';
 import type { ShoppingItem } from '@/lib/types';
 import * as Haptics from 'expo-haptics';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { Plus, ShoppingBag, WifiOff } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -24,7 +25,6 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export function ShopTab() {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const iosMajorVersion = Platform.OS === 'ios' ? Number.parseInt(String(Platform.Version), 10) : null;
   const tabBarClearance = Platform.OS !== 'ios' || (iosMajorVersion != null && iosMajorVersion >= 26) ? 88 : 0;
@@ -47,7 +47,6 @@ export function ShopTab() {
   const isHydrated = useShoppingStore((state) => state.isHydrated);
 
   const [showAddModal, setShowAddModal] = useState(false);
-  const [primaryCtaHeight, setPrimaryCtaHeight] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [detailItem, setDetailItem] = useState<ShoppingItem | null>(null);
@@ -280,15 +279,17 @@ export function ShopTab() {
       </View>
 
       {isLoading && storeItems.length === 0 ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator className="text-emerald-600 dark:text-[#0F8]" />
+        <View className="flex-1 px-6 pt-4">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
         </View>
       ) : (
         <FlatList
           className="flex-1"
           contentContainerClassName="px-6 pt-4"
           contentContainerStyle={{
-            paddingBottom: primaryCtaHeight + insets.bottom + tabBarClearance + 16,
+            paddingBottom: insets.bottom + tabBarClearance + 16,
           }}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -330,20 +331,6 @@ export function ShopTab() {
           }
         />
       )}
-
-      <View
-        className="absolute left-0 right-0 px-6"
-        style={{ bottom: insets.bottom + tabBarClearance }}
-        onLayout={(event) => setPrimaryCtaHeight(event.nativeEvent.layout.height)}
-      >
-        <Button
-          size="lg"
-          onPress={() => router.push('/scan')}
-          label={isOffline ? "I'm Shopping Now (Offline)" : "I'm Shopping Now"}
-          className="w-full"
-          disabled={isOffline}
-        />
-      </View>
 
       <AddItemModal
         visible={showAddModal}

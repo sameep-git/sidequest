@@ -57,6 +57,7 @@ type ItemEditorViewProps = {
     onConfirmMatchToggle: (index: number) => void;
     onConfirmPost: () => void;
     onCancelPost: () => void;
+    isScannerSupported: boolean;
 };
 
 export function ItemEditorView({
@@ -87,6 +88,7 @@ export function ItemEditorView({
     onConfirmMatchToggle,
     onConfirmPost,
     onCancelPost,
+    isScannerSupported,
 }: ItemEditorViewProps) {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
@@ -105,22 +107,16 @@ export function ItemEditorView({
                     <Text className="mt-1 text-sm text-gray-500 dark:text-white/60">Total: ${totalAmount.toFixed(2)}</Text>
                 </View>
                 <View className="flex-row gap-3">
-                    <Pressable
-                        onPress={onScanNew}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        className="flex-1 flex-row items-center justify-center rounded-xl bg-gray-100 px-4 py-3 dark:bg-[#333]"
-                    >
-                        <CameraIcon size={18} className="text-emerald-500 dark:text-[#0F8]" />
-                        <Text className="ml-2 font-semibold text-black dark:text-white">Scan Receipt</Text>
-                    </Pressable>
-                    <Pressable
-                        onPress={onAddItem}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        className="flex-1 flex-row items-center justify-center rounded-xl border border-emerald-500 bg-emerald-50 px-4 py-3 dark:border-0 dark:bg-[#0F8]"
-                    >
-                        <Plus size={18} className="text-emerald-700 dark:text-black" />
-                        <Text className="ml-2 font-semibold text-emerald-700 dark:text-black">Add Item</Text>
-                    </Pressable>
+                    {isScannerSupported && (
+                        <Pressable
+                            onPress={onScanNew}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            className="flex-1 flex-row items-center justify-center rounded-xl bg-emerald-500 px-4 py-3 dark:bg-[#0F8]"
+                        >
+                            <CameraIcon size={18} className="text-white dark:text-black" />
+                            <Text className="ml-2 font-semibold text-white dark:text-black">Scan Receipt</Text>
+                        </Pressable>
+                    )}
                 </View>
             </View>
 
@@ -213,8 +209,6 @@ export function ItemEditorView({
                 }
                 renderItem={({ item }: { item: ReceiptItem }) => {
                     const isSelected = selectedItem === item.id;
-                    const isAssigned = Boolean(item.assignedToUserId) || item.splitType === 'split';
-                    const isSplit = item.splitType === 'split';
 
                     // Determine container styles based on state and theme handled by NativeWind classes where possible,
                     // but complex logic ensures we might need inline styles or clsx/utils.
@@ -298,7 +292,7 @@ export function ItemEditorView({
                     <View className="items-center py-12">
                         <Text className="mb-2 text-lg font-semibold text-black dark:text-white">No items yet</Text>
                         <Text className="text-center text-sm text-gray-500 dark:text-white/60">
-                            Use the buttons above to add items
+                            Scan a receipt or add items manually below
                         </Text>
                     </View>
                 }

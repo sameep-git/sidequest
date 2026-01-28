@@ -1,0 +1,11 @@
+{
+  "name": "receipt-processor",
+  "platforms": [
+    "ios"
+  ],
+  "ios": {
+    "modules": [
+      "ReceiptProcessorModule"
+    ]
+  }
+}

@@ -1,3 +1,4 @@
+import { useColorScheme } from 'nativewind';
 import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, View, type ViewStyle } from 'react-native';
 
@@ -10,6 +11,8 @@ interface SkeletonProps {
 
 export function Skeleton({ width = '100%', height = 16, borderRadius = 8, style }: SkeletonProps) {
     const opacity = useRef(new Animated.Value(0.3)).current;
+    const { colorScheme } = useColorScheme();
+    const isDark = colorScheme === 'dark';
 
     useEffect(() => {
         const animation = Animated.loop(
@@ -33,7 +36,7 @@ export function Skeleton({ width = '100%', height = 16, borderRadius = 8, style 
     return (
         <Animated.View
             style={[
-                styles.skeleton,
+                { backgroundColor: isDark ? '#333' : '#e5e7eb' },
                 { width: width as any, height, borderRadius, opacity },
                 style,
             ]}
@@ -42,8 +45,15 @@ export function Skeleton({ width = '100%', height = 16, borderRadius = 8, style 
 }
 
 export function SkeletonCard({ style }: { style?: ViewStyle }) {
+    const { colorScheme } = useColorScheme();
+    const isDark = colorScheme === 'dark';
+
     return (
-        <View style={[styles.card, style]}>
+        <View style={[
+            styles.card, 
+            { backgroundColor: isDark ? '#2a2a2a' : '#fff', borderColor: isDark ? 'transparent' : '#e5e7eb', borderWidth: isDark ? 0 : 1 },
+            style
+        ]}>
             <View style={styles.cardHeader}>
                 <Skeleton width={40} height={40} borderRadius={20} />
                 <View style={styles.cardHeaderText}>
@@ -70,11 +80,7 @@ export function SkeletonListItem({ style }: { style?: ViewStyle }) {
 }
 
 const styles = StyleSheet.create({
-    skeleton: {
-        backgroundColor: '#333',
-    },
     card: {
-        backgroundColor: '#2a2a2a',
         borderRadius: 16,
         padding: 16,
         marginBottom: 12,

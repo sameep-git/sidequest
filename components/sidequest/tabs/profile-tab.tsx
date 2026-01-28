@@ -1,3 +1,4 @@
+import { SkeletonListItem } from '@/components/ui/skeleton';
 import { useSupabaseUser } from '@/hooks/use-supabase-user';
 import { useHouseholdStore } from '@/lib/household-store';
 import { debtService, transactionService } from '@/lib/services';
@@ -11,7 +12,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HouseholdInvite } from '../household-invite';
-import { SettingsScreen } from '../settings-screen';
+import { SettingsScreen } from '../SettingsScreen';
 
 
 export function ProfileTab() {
@@ -42,7 +43,7 @@ export function ProfileTab() {
       map.set(id, { name, color, venmo: entry.profile?.venmo_handle ?? null });
       return map;
     }, new Map());
-  }, [members]);
+  }, [members, colorScheme]);
 
   const currentMember = useMemo(
     () => members.find((entry) => entry.member.user_id === user?.id),
@@ -145,7 +146,7 @@ export function ProfileTab() {
 
       return Array.from(aggregated.values());
     },
-    [debts, user?.id]
+    [debts, user]
   );
 
   const debtsOwedToYou = useMemo(
@@ -166,7 +167,7 @@ export function ProfileTab() {
 
       return Array.from(aggregated.values());
     },
-    [debts, user?.id]
+    [debts, user]
   );
 
   const amountYouOwe = debtsYouOwe.reduce((sum, debt) => sum + debt.amount, 0);
@@ -296,7 +297,7 @@ export function ProfileTab() {
               onPress={() => setShowInvite(true)}
               className="mt-4 flex-row items-center rounded-full border border-emerald-500 bg-emerald-50 px-4 py-2 dark:border-[#0F8] dark:bg-[#0F8]/10"
             >
-              <UserPlus size={16} className="text-emerald-500 dark:text-[#0F8]" />
+              <UserPlus size={16} color={colorScheme === 'dark' ? 'white' : '#10b981'} />
               <Text className="ml-2 font-semibold text-emerald-500 dark:text-[#0F8]">
                 Invite Roommates
               </Text>
@@ -439,9 +440,10 @@ export function ProfileTab() {
 
 
         {isLoading && (
-          <View className="items-center py-4">
-            <ActivityIndicator color="#0F8" />
-            <Text className="mt-2 text-sm text-white/70">Syncing with Supabase...</Text>
+          <View className="gap-3">
+            <SkeletonListItem />
+            <SkeletonListItem />
+            <SkeletonListItem />
           </View>
         )}
 

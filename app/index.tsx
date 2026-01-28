@@ -6,9 +6,11 @@ import { useSupabaseUser } from '@/hooks/use-supabase-user';
 import { useHouseholdStore } from '@/lib/household-store';
 import { hasRequiredPermissions } from '@/lib/permissions';
 import { householdService } from '@/lib/services';
+import { getPendingJoinCode, hasPendingJoinCode } from '@/lib/utils/deep-link';
+import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Image, Text, View } from 'react-native';
 
 type AppPhase = 'loading' | 'landing' | 'email-auth' | 'household' | 'permissions' | 'main';
 
@@ -21,10 +23,10 @@ export default function IndexScreen() {
   const setHousehold = useHouseholdStore((state) => state.setHousehold);
   const setMembers = useHouseholdStore((state) => state.setMembers);
 
+  // When component mounts or is focused, check status
+  const isFocused = useIsFocused();
 
-
-  // Check if user already has a household
-  useEffect(() => {
+  const checkStatus = useCallback(async () => {
     if (isAuthLoading) return;
 
     // Don't reset phase if user is in email-auth or household flows
@@ -40,30 +42,66 @@ export default function IndexScreen() {
 
     (async () => {
       try {
-        const result = await householdService.getPrimaryHouseholdForUser(user.id);
-        setHasCheckedHousehold(true);
-        if (result) {
+        const proceedWithHousehold = async (data: any) => {
+          setHasCheckedHousehold(true);
           setHousehold({
-            householdId: result.household.id,
-            houseName: result.household.name,
-            joinCode: result.household.join_code,
+            householdId: data.household.id,
+            houseName: data.household.name,
+            joinCode: data.household.join_code,
           });
-          const members = await householdService.getMembers(result.household.id);
+          const members = await householdService.getMembers(data.household.id);
           setMembers(members);
 
-          // Check if user has granted permissions
           const permissionsGranted = await hasRequiredPermissions();
-
           if (permissionsGranted) {
-            console.log('[Index] Permissions granted. Navigating to tabs.');
             setIsNavigating(true);
             router.replace('/(tabs)');
           } else {
-            console.log('[Index] Permissions not granted. Setting phase to permissions.');
             setPhase('permissions');
           }
+        };
+        const result = await householdService.getPrimaryHouseholdForUser(user.id);
+
+        // If user has a household, check if they are trying to join a NEW one via deep link
+        if (result) {
+          const hasPending = await hasPendingJoinCode();
+          if (hasPending) {
+            Alert.alert(
+              'Household Invite',
+              'You have an invite to join another household. Do you want to leave your current one to join?',
+              [
+                {
+                  text: 'Ignore',
+                  style: 'cancel',
+                  onPress: async () => {
+                    await getPendingJoinCode(); // Clear it
+                    proceedWithHousehold(result);
+                  }
+                },
+                {
+                  text: 'Switch Household',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      await householdService.leave(result.household.id, user.id);
+                      useHouseholdStore.getState().reset();
+                      setHasCheckedHousehold(false);
+                      setPhase('loading');
+                      checkStatus();
+                    } catch {
+                      Alert.alert('Error', 'Failed to leave household');
+                      proceedWithHousehold(result);
+                    }
+                  }
+                }
+              ]
+            );
+            return;
+          }
+
+          proceedWithHousehold(result);
         } else {
-          console.log('[Index] No primary household found. Setting phase to household gate.');
+          setHasCheckedHousehold(true);
           setPhase('household');
         }
       } catch (error) {
@@ -74,10 +112,25 @@ export default function IndexScreen() {
     })();
   }, [user, isAuthLoading, hasCheckedHousehold, phase, setHousehold, setMembers, router]);
 
+  useEffect(() => {
+    if (isFocused) {
+      checkStatus();
+    }
+  }, [checkStatus, isFocused]);
+
   if (phase === 'loading' || isNavigating) {
     return (
       <View className="flex-1 items-center justify-center bg-[#111]">
-        <ActivityIndicator color="#0F8" size="large" />
+        <View className="h-24 w-24 items-center justify-center rounded-[28px] bg-[#0F8] shadow-[0_8px_16px_rgba(15,248,136,0.35)]">
+          <Image
+            source={require('@/assets/images/android-chrome-512x512.png')}
+            accessibilityLabel="sidequest logo"
+            className="h-16 w-16"
+            resizeMode="contain"
+          />
+        </View>
+        <Text className="mt-4 text-2xl font-bold text-white">sidequest</Text>
+        <ActivityIndicator color="#0F8" size="small" style={{ marginTop: 16 }} />
       </View>
     );
   }

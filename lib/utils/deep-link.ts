@@ -10,18 +10,24 @@ const PENDING_JOIN_CODE_KEY = '@sidequest/pending_join_code';
 export function parseJoinCode(url: string): string | null {
     try {
         const parsed = Linking.parse(url);
+        console.log('[DeepLink] Parsing:', url, JSON.stringify(parsed));
 
-        // Handle sidequest://join/123456
+        // Case 1: sidequest://join/123456 -> hostname='join', path='123456'
+        if (parsed.hostname === 'join') {
+            const code = parsed.path?.replace(/^\//, '') || ''; // Remove leading slash
+            if (/^\d{6}$/.test(code)) return code;
+        }
+
+        // Case 2: sidequest:///join/123456 -> path='join/123456'
         if (parsed.path?.startsWith('join/')) {
             const code = parsed.path.replace('join/', '');
-            // Validate it's a 6-digit code
             if (/^\d{6}$/.test(code)) {
                 return code;
             }
         }
 
-        // Handle sidequest://join?code=123456
-        if (parsed.path === 'join' && parsed.queryParams?.code) {
+        // Case 3: sidequest://join?code=123456
+        if ((parsed.path === 'join' || parsed.hostname === 'join') && parsed.queryParams?.code) {
             const code = String(parsed.queryParams.code);
             if (/^\d{6}$/.test(code)) {
                 return code;
@@ -29,7 +35,8 @@ export function parseJoinCode(url: string): string | null {
         }
 
         return null;
-    } catch {
+    } catch (e) {
+        console.error('[DeepLink] Parse Error:', e);
         return null;
     }
 }

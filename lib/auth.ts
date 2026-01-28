@@ -56,6 +56,12 @@ export const authService = {
         avatar_url: null,
         venmo_handle: null,
       });
+    } else if (displayName && !user.display_name) {
+      // If user exists but display_name is missing (trigger missed it), update it
+      user = await userService.upsert({
+        ...user,
+        display_name: displayName,
+      });
     }
 
     return user;
