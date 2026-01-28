@@ -1,8 +1,9 @@
 import { CameraView as ExpoCameraView } from 'expo-camera';
 import { Camera as CameraIcon } from 'lucide-react-native';
 import { RefObject } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { EdgeInsets, SafeAreaView } from 'react-native-safe-area-context';
+import { ScanningAnimation } from './scanning-animation';
 
 type CameraViewProps = {
     isProcessing: boolean;
@@ -24,11 +25,7 @@ export function CameraView({
     if (isProcessing) {
         return (
             <SafeAreaView edges={['top']} className="flex-1 items-center justify-center bg-white dark:bg-[#222]">
-                <View className="items-center">
-                    <ActivityIndicator size="large" color="#0F8" />
-                    <Text className="mt-3 text-xl font-semibold text-black dark:text-white">Analyzing Receipt</Text>
-                    <Text className="mt-1 text-sm text-gray-500 dark:text-white/70">Detecting items and prices...</Text>
-                </View>
+                <ScanningAnimation />
             </SafeAreaView>
         );
     }

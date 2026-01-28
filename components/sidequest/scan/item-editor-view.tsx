@@ -57,6 +57,7 @@ type ItemEditorViewProps = {
     onConfirmMatchToggle: (index: number) => void;
     onConfirmPost: () => void;
     onCancelPost: () => void;
+    isScannerSupported: boolean;
 };
 
 export function ItemEditorView({
@@ -87,6 +88,7 @@ export function ItemEditorView({
     onConfirmMatchToggle,
     onConfirmPost,
     onCancelPost,
+    isScannerSupported,
 }: ItemEditorViewProps) {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
@@ -105,14 +107,16 @@ export function ItemEditorView({
                     <Text className="mt-1 text-sm text-gray-500 dark:text-white/60">Total: ${totalAmount.toFixed(2)}</Text>
                 </View>
                 <View className="flex-row gap-3">
-                    <Pressable
-                        onPress={onScanNew}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        className="flex-1 flex-row items-center justify-center rounded-xl bg-gray-100 px-4 py-3 dark:bg-[#333]"
-                    >
-                        <CameraIcon size={18} className="text-emerald-500 dark:text-[#0F8]" />
-                        <Text className="ml-2 font-semibold text-black dark:text-white">Scan Receipt</Text>
-                    </Pressable>
+                    {isScannerSupported && (
+                        <Pressable
+                            onPress={onScanNew}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            className="flex-1 flex-row items-center justify-center rounded-xl bg-gray-100 px-4 py-3 dark:bg-[#333]"
+                        >
+                            <CameraIcon size={18} className="text-emerald-500 dark:text-[#0F8]" />
+                            <Text className="ml-2 font-semibold text-black dark:text-white">Scan Receipt</Text>
+                        </Pressable>
+                    )}
                     <Pressable
                         onPress={onAddItem}
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}

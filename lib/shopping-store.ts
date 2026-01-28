@@ -80,7 +80,7 @@ export const useShoppingStore = create<ShoppingState>()(
             clearQueue: () => set({ offlineQueue: [] }),
 
             syncOfflineActions: async () => {
-                const { offlineQueue, removeItem, updateItem: storeUpdateItem } = get();
+                const { offlineQueue, replaceItem } = get();
                 if (offlineQueue.length === 0) return;
 
                 const failedActions: OfflineAction[] = [];
@@ -89,7 +89,9 @@ export const useShoppingStore = create<ShoppingState>()(
                     try {
                         switch (action.type) {
                             case 'add':
-                                await shoppingService.create(action.payload);
+                                const newItem = await shoppingService.create(action.payload);
+                                // Replace temporary ID with real server ID
+                                replaceItem(action.payload.id, newItem);
                                 break;
                             case 'update':
                                 await shoppingService.updateStatus(

@@ -8,6 +8,7 @@ import { debtService, shoppingService, transactionService } from '@/lib/services
 import type { ShoppingItem } from '@/lib/types';
 import { getDisplayName } from '@/lib/utils/display-name';
 import { buildReceiptFromLines, type ReceiptItem } from '@/lib/utils/receipt-parser';
+import * as ReceiptProcessor from '../../../modules/receipt-processor';
 import { CameraView as ExpoCameraView } from 'expo-camera';
 import { useFocusEffect } from 'expo-router';
 import { WifiOff } from 'lucide-react-native';
@@ -235,6 +236,34 @@ export function ScanTab() {
         Alert.alert('Capture failed', 'Could not capture receipt. Try again.');
         setScanState('idle');
         return;
+      }
+
+      // Try Native AI Scanning first (iOS 18+)
+      // This uses on-device LLM (Apple Foundation Models) for superior accuracy
+      if (ReceiptProcessor.isSupported()) {
+        try {
+          const result = await ReceiptProcessor.scanReceipt(photo.uri);
+          
+          if (result && result.items && result.items.length > 0) {
+            const items: ReceiptItem[] = result.items.map((item, index) => ({
+              id: `${index}-${Math.random().toString(36).slice(2, 8)}`,
+              name: item.name,
+              price: item.price,
+              displayPrice: item.price.toFixed(2),
+              splitType: 'individual'
+            }));
+
+            setReceiptItems(items);
+            setSelectedItem(null);
+            setBountyMatches([]); 
+            findBountyMatches(items); 
+            setScanState('itemizing');
+            return;
+          }
+        } catch (e) {
+          // Native AI scan failed, falling back to regex
+          // Fallback to legacy regex parser
+        }
       }
 
       // Recognize text on-device via react-native-text-recognition (uses Apple Vision on iOS)
@@ -554,6 +583,8 @@ export function ScanTab() {
 
     setIsPosting(true);
     setShowMatchConfirmation(false);
+    let transactionId: string | null = null;
+
     try {
       const transaction = await transactionService.create({
         household_id: householdId,
@@ -565,6 +596,7 @@ export function ScanTab() {
         tip_amount: 0,
         final_total: totalAmount,
       });
+      transactionId = transaction.id;
 
       const debtEntries = roommates
         .map((roommate) => ({ roommate, amount: roommateTotals[roommate.id] || 0 }))
@@ -631,6 +663,14 @@ export function ScanTab() {
 
       setScanState('summary');
     } catch (err) {
+      if (transactionId) {
+        // Rollback: delete the partial transaction to prevent ghost entries
+        try {
+          await transactionService.delete(transactionId);
+        } catch (cleanupError) {
+          // silently fail cleanup if network is totally dead
+        }
+      }
       Alert.alert('Could not post receipt', err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setIsPosting(false);
@@ -734,6 +774,8 @@ export function ScanTab() {
   if (scanState === 'summary') {
     const earnedBounty = bountyMatches
       .filter(m => m.confirmed !== false)
+      // Only count bounties if the item was requested by someone else
+      .filter(m => m.shoppingItem.requested_by && m.shoppingItem.requested_by !== user?.id)
       .reduce((sum, m) => sum + (m.shoppingItem.bounty_amount || 0), 0);
 
     // Calculate bounties per roommate (bounty is owed by the person who requested the item)
@@ -803,6 +845,7 @@ export function ScanTab() {
       onConfirmMatchToggle={handleConfirmMatchToggle}
       onConfirmPost={() => actuallyPostToHouse(pendingShoppingMatches)}
       onCancelPost={() => setShowMatchConfirmation(false)}
+      isScannerSupported={Platform.OS === 'ios' && ReceiptProcessor.isSupported()}
     />
   );
 }

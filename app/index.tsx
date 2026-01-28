@@ -8,7 +8,7 @@ import { hasRequiredPermissions } from '@/lib/permissions';
 import { householdService } from '@/lib/services';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Image, Text, View } from 'react-native';
 
 type AppPhase = 'loading' | 'landing' | 'email-auth' | 'household' | 'permissions' | 'main';
 
@@ -55,15 +55,12 @@ export default function IndexScreen() {
           const permissionsGranted = await hasRequiredPermissions();
 
           if (permissionsGranted) {
-            console.log('[Index] Permissions granted. Navigating to tabs.');
             setIsNavigating(true);
             router.replace('/(tabs)');
           } else {
-            console.log('[Index] Permissions not granted. Setting phase to permissions.');
             setPhase('permissions');
           }
         } else {
-          console.log('[Index] No primary household found. Setting phase to household gate.');
           setPhase('household');
         }
       } catch (error) {
@@ -77,7 +74,16 @@ export default function IndexScreen() {
   if (phase === 'loading' || isNavigating) {
     return (
       <View className="flex-1 items-center justify-center bg-[#111]">
-        <ActivityIndicator color="#0F8" size="large" />
+        <View className="h-24 w-24 items-center justify-center rounded-[28px] bg-[#0F8] shadow-[0_8px_16px_rgba(15,248,136,0.35)]">
+          <Image
+            source={require('@/assets/images/android-chrome-512x512.png')}
+            accessibilityLabel="sidequest logo"
+            className="h-16 w-16"
+            resizeMode="contain"
+          />
+        </View>
+        <Text className="mt-4 text-2xl font-bold text-white">sidequest</Text>
+        <ActivityIndicator color="#0F8" size="small" style={{ marginTop: 16 }} />
       </View>
     );
   }
