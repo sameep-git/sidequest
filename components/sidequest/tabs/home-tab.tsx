@@ -6,10 +6,10 @@ import type { ShoppingItem, Transaction, TransactionItem } from '@/lib/types';
 import { getDisplayName } from '@/lib/utils/display-name';
 import { formatDistanceToNow } from 'date-fns';
 import { useFocusEffect } from 'expo-router';
-import { DollarSign, Trophy, X } from 'lucide-react-native';
+import { DollarSign, Trash2, Trophy, X } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Alert, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import MapView, { Callout, Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -94,6 +94,37 @@ export function HomeTab({ houseName }: HomeTabProps) {
       });
     }
   }, [user]);
+
+  const handleDeleteTransaction = async () => {
+    if (!selectedTxn) return;
+
+    Alert.alert(
+      'Delete Trip?',
+      'This will remove this trip and all associated debts. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsLoading(true);
+              await transactionService.delete(selectedTxn.id);
+              // Optimistic update
+              setTransactions(prev => prev.filter(t => t.id !== selectedTxn.id));
+              // feedEntries is memoized on transactions, so updating transactions is enough!
+              setSelectedTxn(null);
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete trip. Please try again.');
+              console.error(error);
+            } finally {
+              setIsLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
 
   const handleSelectTransaction = async (txn: Transaction) => {
     setSelectedTxn(txn);
@@ -350,10 +381,9 @@ export function HomeTab({ houseName }: HomeTabProps) {
               <Text className="text-lg font-bold text-black dark:text-white">Trip Details</Text>
               <Pressable
                 onPress={() => setSelectedTxn(null)}
-                className="p-2"
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                className="p-2 -mr-2 rounded-full bg-gray-100 dark:bg-[#333]"
               >
-                <X size={24} className="text-black dark:text-white" />
+                <X size={20} className="text-gray-600 dark:text-white" />
               </Pressable>
             </View>
 
@@ -390,6 +420,20 @@ export function HomeTab({ houseName }: HomeTabProps) {
                 </View>
               )}
             </ScrollView>
+
+            {selectedTxn && user && selectedTxn.payer_id === user.id && (
+              <View className="px-6 pb-8 pt-2">
+                <Pressable
+                  onPress={handleDeleteTransaction}
+                  className="items-center justify-center rounded-2xl py-4 border-2 border-red-400 bg-red-50 dark:bg-red-500/10"
+                >
+                  <View className="flex-row items-center">
+                    <Trash2 size={18} color={isDark ? 'white' : '#ef4444'} />
+                    <Text className="ml-2 font-semibold text-red-500 dark:text-red-400">Delete Trip</Text>
+                  </View>
+                </Pressable>
+              </View>
+            )}
           </View>
         </Modal>
       </View>

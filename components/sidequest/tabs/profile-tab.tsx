@@ -297,7 +297,7 @@ export function ProfileTab() {
               onPress={() => setShowInvite(true)}
               className="mt-4 flex-row items-center rounded-full border border-emerald-500 bg-emerald-50 px-4 py-2 dark:border-[#0F8] dark:bg-[#0F8]/10"
             >
-              <UserPlus size={16} className="text-emerald-500 dark:text-[#0F8]" />
+              <UserPlus size={16} color={colorScheme === 'dark' ? 'white' : '#10b981'} />
               <Text className="ml-2 font-semibold text-emerald-500 dark:text-[#0F8]">
                 Invite Roommates
               </Text>

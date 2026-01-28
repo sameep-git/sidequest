@@ -9,9 +9,9 @@ export default {
     userInterfaceStyle: 'automatic',
     newArchEnabled: true,
     ios: {
+      supportsTablet: false,
       bundleIdentifier: 'com.sameepshah.sidequest',
-      supportsTablet: true,
-      buildNumber: '5',
+      buildNumber: '6',
       infoPlist: {
         NSLocationWhenInUseUsageDescription: 'sidequest needs your location to notify you when you\'re near stores with active bounties.',
         NSLocationAlwaysAndWhenInUseUsageDescription: 'sidequest needs your location always to send you notifications about nearby stores, even when the app is in the background.',

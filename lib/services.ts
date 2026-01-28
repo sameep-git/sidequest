@@ -305,6 +305,15 @@ export const transactionService = {
   },
 
   async delete(id: string): Promise<void> {
+    // Manual cascade delete because Supabase foreign keys might not be set to CASCADE
+
+    // 1. Delete associated debts (ignore error if none exist)
+    await supabase.from('debt_ledger').delete().eq('transaction_id', id);
+
+    // 2. Delete associated items (ignore error if none exist)
+    await supabase.from('transaction_items').delete().eq('transaction_id', id);
+
+    // 3. Delete the transaction itself
     const { error } = await supabase.from('transactions').delete().eq('id', id);
     if (error) throw error;
   },
