@@ -1,3 +1,4 @@
+import { SkeletonListItem } from '@/components/ui/skeleton';
 import { useSupabaseUser } from '@/hooks/use-supabase-user';
 import { useHouseholdStore } from '@/lib/household-store';
 import { debtService, transactionService } from '@/lib/services';
@@ -439,9 +440,10 @@ export function ProfileTab() {
 
 
         {isLoading && (
-          <View className="items-center py-4">
-            <ActivityIndicator color="#0F8" />
-            <Text className="mt-2 text-sm text-white/70">Syncing with Supabase...</Text>
+          <View className="gap-3">
+            <SkeletonListItem />
+            <SkeletonListItem />
+            <SkeletonListItem />
           </View>
         )}
 

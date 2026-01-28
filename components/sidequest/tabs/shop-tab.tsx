@@ -2,6 +2,7 @@ import { AddItemModal } from '@/components/sidequest/shop/add-item-modal';
 import { ItemDetailsSheet } from '@/components/sidequest/shop/item-details-sheet';
 import { ShoppingListItem } from '@/components/sidequest/shop/shopping-list-item';
 import { Button } from '@/components/ui/button';
+import { SkeletonCard } from '@/components/ui/skeleton';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { useSupabaseUser } from '@/hooks/use-supabase-user';
 import { useHouseholdStore } from '@/lib/household-store';
@@ -278,8 +279,10 @@ export function ShopTab() {
       </View>
 
       {isLoading && storeItems.length === 0 ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator className="text-emerald-600 dark:text-[#0F8]" />
+        <View className="flex-1 px-6 pt-4">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
         </View>
       ) : (
         <FlatList
