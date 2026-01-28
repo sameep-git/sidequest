@@ -87,7 +87,7 @@ export function ScanTab() {
       });
       return acc;
     }, []);
-  }, [members, user?.id]);
+  }, [members, user]);
 
   const participantCount = Math.max(roommates.length + 1, 1);
 
@@ -116,7 +116,7 @@ export function ScanTab() {
       }
       return sum;
     }, 0);
-  }, [participantCount, receiptItems, user?.id]);
+  }, [participantCount, receiptItems, user]);
 
   const roommateTotals = useMemo(() => {
     const totals: Record<string, number> = {};
@@ -157,7 +157,7 @@ export function ScanTab() {
     });
 
     return totals;
-  }, [participantCount, receiptItems, roommates, user?.id]);
+  }, [participantCount, receiptItems, roommates, user]);
 
   const youAreOwed = Math.max(totalAmount - yourShare, 0);
 
@@ -260,7 +260,7 @@ export function ScanTab() {
             setScanState('itemizing');
             return;
           }
-        } catch (e) {
+        } catch {
           // Native AI scan failed, falling back to regex
           // Fallback to legacy regex parser
         }
@@ -667,7 +667,7 @@ export function ScanTab() {
         // Rollback: delete the partial transaction to prevent ghost entries
         try {
           await transactionService.delete(transactionId);
-        } catch (cleanupError) {
+        } catch {
           // silently fail cleanup if network is totally dead
         }
       }

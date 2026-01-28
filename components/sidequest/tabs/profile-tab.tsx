@@ -42,7 +42,7 @@ export function ProfileTab() {
       map.set(id, { name, color, venmo: entry.profile?.venmo_handle ?? null });
       return map;
     }, new Map());
-  }, [members]);
+  }, [members, colorScheme]);
 
   const currentMember = useMemo(
     () => members.find((entry) => entry.member.user_id === user?.id),
@@ -145,7 +145,7 @@ export function ProfileTab() {
 
       return Array.from(aggregated.values());
     },
-    [debts, user?.id]
+    [debts, user]
   );
 
   const debtsOwedToYou = useMemo(
@@ -166,7 +166,7 @@ export function ProfileTab() {
 
       return Array.from(aggregated.values());
     },
-    [debts, user?.id]
+    [debts, user]
   );
 
   const amountYouOwe = debtsYouOwe.reduce((sum, debt) => sum + debt.amount, 0);

@@ -2,7 +2,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import * as Sentry from '@sentry/react-native';
 import * as Linking from 'expo-linking';
 import * as Notifications from 'expo-notifications';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
@@ -16,6 +16,7 @@ import '../global.css';
 import { ErrorBoundary } from '@/components/sidequest/error-boundary';
 import { OfflineBanner } from '@/components/sidequest/offline-banner';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useSupabaseUser } from '@/hooks/use-supabase-user';
 import { parseJoinCode, storePendingJoinCode } from '@/lib/utils/deep-link';
 
 Sentry.init({
@@ -33,6 +34,16 @@ function RootLayout() {
   const colorScheme = useColorScheme();
   const [isReady, setIsReady] = useState(false);
   const router = useRouter();
+  const segments = useSegments();
+  const { user, isLoading } = useSupabaseUser();
+
+  useEffect(() => {
+    // If the user is not signed in and the initial segment is "(tabs)",
+    // redirect to the sign-in screen.
+    if (!isLoading && !user && segments[0] === '(tabs)') {
+      router.replace('/');
+    }
+  }, [user, isLoading, segments, router]);
 
   useEffect(() => {
     // Request location permissions on startup
@@ -54,8 +65,8 @@ function RootLayout() {
       if (joinCode) {
         // Store the code - it will be processed after auth/onboarding
         await storePendingJoinCode(joinCode);
-        // Navigate to onboarding which will handle the join
-        router.replace('/onboarding' as any);
+        // Navigate to root which handles onboarding
+        router.replace('/');
       }
     };
 
@@ -98,13 +109,6 @@ function RootLayout() {
                 }}
               >
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen
-                  name="onboarding"
-                  options={{
-                    headerShown: false,
-                    presentation: 'fullScreenModal',
-                  }}
-                />
               </Stack>
             </View>
           </ErrorBoundary>

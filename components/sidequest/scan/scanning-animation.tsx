@@ -35,7 +35,7 @@ export function ScanningAnimation() {
       -1, // Infinite
       false
     );
-  }, []);
+  }, [scanLinePosition]);
 
   // Message rotation loop
   useEffect(() => {
