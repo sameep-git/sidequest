@@ -96,7 +96,7 @@ export function PermissionPrimer({ onContinue }: PermissionPrimerProps) {
             disabled={isRequesting}
           >
             <Text className="text-center text-base font-semibold text-white dark:text-black">
-              {isRequesting ? 'Requesting...' : 'Enable Permissions'}
+              {isRequesting ? 'Requesting...' : 'Continue'}
             </Text>
           </Pressable>
 

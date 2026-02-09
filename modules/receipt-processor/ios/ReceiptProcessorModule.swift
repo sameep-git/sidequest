@@ -2,6 +2,8 @@ import ExpoModulesCore
 import Vision
 import UIKit
 import FoundationModels
+import CoreImage
+import CoreImage.CIFilterBuiltins
 
 public class ReceiptProcessorModule: Module {
   public func definition() -> ModuleDefinition {
@@ -15,16 +17,12 @@ public class ReceiptProcessorModule: Module {
     }
 
     AsyncFunction("scan") { (imageUri: String, promise: Promise) in
-      // Check for iOS 26.0+ explicitly (using 26 as placeholder based on error logs, 
-      // but in reality we need to handle the availability check correctly for Swift compiler)
+      // Check for iOS 26.0+ explicitly
       guard #available(iOS 26.0, *) else {
         promise.reject("ERR_UNSUPPORTED", "This feature requires iOS 26.0 or later.")
         return
       }
       
-      // ... (rest of code)
-
-      // Handle file:// URIs properly
       guard let url = URL(string: imageUri) else {
         promise.reject("ERR_INVALID_URI", "Invalid image URI")
         return
@@ -33,19 +31,70 @@ public class ReceiptProcessorModule: Module {
       let finalUrl = url.scheme == nil ? URL(fileURLWithPath: imageUri) : url
 
       guard let data = try? Data(contentsOf: finalUrl),
-            let image = UIImage(data: data),
-            let cgImage = image.cgImage else {
+            let uiImage = UIImage(data: data),
+            let originalCgImage = uiImage.cgImage else {
         promise.reject("ERR_INVALID_IMAGE", "Could not load image data")
         return
       }
 
-      // 2. OCR via Vision
+      // 1. Preprocessing: Detect and Crop Receipt
+      var imageToProcess = originalCgImage
+      
+      let detectRequest = VNDetectDocumentSegmentationRequest()
+      let detectHandler = VNImageRequestHandler(cgImage: originalCgImage, options: [:])
+      
+      // Try to find the document bounds
+      try? detectHandler.perform([detectRequest])
+      
+      if let observation = detectRequest.results?.first {
+          // We found a rectangle. Use Core Image to correct perspective.
+          let ciImage = CIImage(cgImage: originalCgImage)
+          let width = CGFloat(originalCgImage.width)
+          let height = CGFloat(originalCgImage.height)
+          
+          // Convert normalized coordinates (0..1) to image coordinates (pixels)
+          let topLeft = CIVector(x: observation.topLeft.x * width, y: observation.topLeft.y * height)
+          let topRight = CIVector(x: observation.topRight.x * width, y: observation.topRight.y * height)
+          let bottomLeft = CIVector(x: observation.bottomLeft.x * width, y: observation.bottomLeft.y * height)
+          let bottomRight = CIVector(x: observation.bottomRight.x * width, y: observation.bottomRight.y * height)
+          
+          // Use string-based key for filter to ensure compatibility if CIFilterBuiltins is finicky
+          if let filter = CIFilter(name: "CIPerspectiveCorrection") {
+              filter.setValue(ciImage, forKey: kCIInputImageKey)
+              filter.setValue(topLeft, forKey: "inputTopLeft")
+              filter.setValue(topRight, forKey: "inputTopRight")
+              filter.setValue(bottomLeft, forKey: "inputBottomLeft")
+              filter.setValue(bottomRight, forKey: "inputBottomRight")
+              
+              if let outputImage = filter.outputImage {
+                  // Optional: Enhance contrast and desaturate (binarization-lite)
+                  if let colorFilter = CIFilter(name: "CIColorControls") {
+                      colorFilter.setValue(outputImage, forKey: kCIInputImageKey)
+                      colorFilter.setValue(1.1, forKey: kCIInputContrastKey) // Boost contrast
+                      colorFilter.setValue(0.0, forKey: kCIInputSaturationKey) // Grayscale
+                      
+                      if let enhancedImage = colorFilter.outputImage {
+                          let context = CIContext()
+                          if let resultRef = context.createCGImage(enhancedImage, from: enhancedImage.extent) {
+                              imageToProcess = resultRef
+                          }
+                      }
+                  } else {
+                      let context = CIContext()
+                      if let resultRef = context.createCGImage(outputImage, from: outputImage.extent) {
+                          imageToProcess = resultRef
+                      }
+                  }
+              }
+          }
+      }
+
+      // 2. OCR via Vision (using the potentially cropped/enhanced image)
       let request = VNRecognizeTextRequest()
       request.recognitionLevel = .accurate
-      // Optimize for receipt reading (dense text)
       request.usesLanguageCorrection = true
       
-      let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+      let handler = VNImageRequestHandler(cgImage: imageToProcess, options: [:])
       
       do {
         try handler.perform([request])
@@ -54,6 +103,7 @@ public class ReceiptProcessorModule: Module {
           return
         }
         
+        // Preserve some structural clues by joining with newlines
         let recognizedText = observations
             .compactMap { $0.topCandidates(1).first?.string }
             .joined(separator: "\n")
@@ -64,40 +114,40 @@ public class ReceiptProcessorModule: Module {
         }
 
         // 3. LLM via LanguageModelSession
-        // We wrap this in a separate availability check to satisfy the Swift compiler
         if #available(iOS 26.0, *) {
             Task {
                 do {
                     let session = LanguageModelSession()
                     let prompt = """
-                    You are a receipt parsing assistant.
-                    Analyze the following receipt text and extract:
-                    1. The store name (detectedStore) - infer from header or logo text.
-                    2. A list of items (items), each with a 'name' (cleaned up) and 'price' (number).
+                    Extract data from this receipt into JSON.
                     
-                    Ignore tax lines, subtotals, and payment details in the items list.
+                    Structure:
+                    - "detectedStore": Name of the store (from header/logo).
+                    - "items": Array of purchased items.
                     
-                    Return ONLY valid JSON with this structure:
+                    Item Rules:
+                    - "name": Clean item description (fix OCR errors, e.g. "M1lk" -> "Milk").
+                    - "price": Number only.
+                    - Exclude: Subtotals, tax, total due, change, card info, dates.
+                    - If "2 @ 3.00", price is 6.00.
+                    
+                    JSON Format (Strict):
                     {
                       "detectedStore": "Store Name",
                       "items": [
-                        { "name": "Item Name", "price": 10.99 }
+                        { "name": "Item Name", "price": 0.00 }
                       ]
                     }
                     
-                    Do not include markdown formatting or explanations. Just the JSON string.
-
                     Receipt Text:
                     \(recognizedText)
                     """
                     
                     let response = try await session.respond(to: prompt)
                     
-                    // Extract text content
-                    // Cast is unnecessary if response.content is already String, but kept for safety in beta API
                     let responseText = String(response.content)
                     
-                    // Clean up any markdown code blocks if the model adds them
+                    // Clean up markdown if present
                     let cleanJson = responseText
                         .replacingOccurrences(of: "```json", with: "")
                         .replacingOccurrences(of: "```", with: "")

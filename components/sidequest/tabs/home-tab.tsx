@@ -272,44 +272,6 @@ export function HomeTab({ houseName }: HomeTabProps) {
 
 
         <View className="flex-1 px-6 pt-4" style={{ paddingBottom: 0 }}>
-          {Platform.OS === 'ios' && userLocation && (
-            <View className="mb-6 h-48 overflow-hidden rounded-3xl border border-gray-200 dark:border-[#333]">
-              <MapView
-                provider={PROVIDER_DEFAULT}
-                style={{ flex: 1 }}
-                initialRegion={{
-                  latitude: userLocation.latitude,
-                  longitude: userLocation.longitude,
-                  latitudeDelta: 0.04,
-                  longitudeDelta: 0.04,
-                }}
-                showsUserLocation
-                userInterfaceStyle={isDark ? 'dark' : 'light'}
-              >
-                {stores.map((store, index) => (
-                  <Marker
-                    key={`${store.name}-${index}`}
-                    coordinate={{ latitude: store.latitude, longitude: store.longitude }}
-                    title={store.name}
-                    description="Tap for directions"
-                    pinColor={accentGreen}
-                    onCalloutPress={() => handleOpenNavigation(store)}
-                  >
-                    <Callout tooltip={false}>
-                      <View style={{ padding: 8, minWidth: 120 }}>
-                        <Text style={{ fontWeight: '600', fontSize: 14, color: '#000' }}>{store.name}</Text>
-                        <Text style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Tap for directions →</Text>
-                      </View>
-                    </Callout>
-                  </Marker>
-                ))}
-              </MapView>
-            </View>
-          )}
-
-
-          <Text className="mb-3 uppercase tracking-wider text-gray-500 dark:text-[#aaa]">Recent Activity</Text>
-
           <ScrollView
             contentInsetAdjustmentBehavior={tabBarClearance > 0 ? 'automatic' : 'never'}
             contentInset={tabBarClearance > 0 ? { bottom: 24 } : undefined}
@@ -319,6 +281,47 @@ export function HomeTab({ houseName }: HomeTabProps) {
             showsVerticalScrollIndicator={false}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchData} tintColor={accentGreen} />}
           >
+            {Platform.OS === 'ios' && userLocation && (
+              <View className="mb-6 h-48 overflow-hidden rounded-3xl border border-gray-200 dark:border-[#333]">
+                <MapView
+                  provider={PROVIDER_DEFAULT}
+                  style={{ flex: 1 }}
+                  initialRegion={{
+                    latitude: userLocation.latitude,
+                    longitude: userLocation.longitude,
+                    latitudeDelta: 0.04,
+                    longitudeDelta: 0.04,
+                  }}
+                  showsUserLocation
+                  userInterfaceStyle={isDark ? 'dark' : 'light'}
+                  scrollEnabled={true}
+                  zoomEnabled={false}
+                  rotateEnabled={false}
+                  pitchEnabled={false}
+                >
+                  {stores.map((store, index) => (
+                    <Marker
+                      key={`${store.name}-${index}`}
+                      coordinate={{ latitude: store.latitude, longitude: store.longitude }}
+                      title={store.name}
+                      description="Tap for directions"
+                      pinColor={accentGreen}
+                      onCalloutPress={() => handleOpenNavigation(store)}
+                    >
+                      <Callout tooltip={false}>
+                        <View style={{ padding: 8, minWidth: 120 }}>
+                          <Text style={{ fontWeight: '600', fontSize: 14, color: '#000' }}>{store.name}</Text>
+                          <Text style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Tap for directions →</Text>
+                        </View>
+                      </Callout>
+                    </Marker>
+                  ))}
+                </MapView>
+              </View>
+            )}
+
+            <Text className="mb-3 uppercase tracking-wider text-gray-500 dark:text-[#aaa]">Recent Activity</Text>
+
             {isLoading ? (
               <Text className="text-sm text-gray-500 dark:text-[#777]">Loading activity...</Text>
             ) : feedEntries.length === 0 ? (
