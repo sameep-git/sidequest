@@ -1,8 +1,9 @@
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
+    Keyboard,
     KeyboardAvoidingView,
     Platform,
     Pressable,
@@ -39,16 +40,59 @@ export function AddItemModal({ visible, onClose, onAdd, isLoading }: AddItemModa
     const [category, setCategory] = useState<string | null>(null);
     const [hasBounty, setHasBounty] = useState(false);
     const [bountyAmount, setBountyAmount] = useState('');
+    const nameInputRef = useRef<TextInput>(null);
 
-    // iOS version-aware padding for tab bar
-    const iosMajorVersion = Platform.OS === 'ios' ? Number.parseInt(String(Platform.Version), 10) : null;
-    const tabBarClearance = Platform.OS !== 'ios' || (iosMajorVersion != null && iosMajorVersion >= 26) ? 88 : 0;
-    const bottomPadding = Math.max(24, insets.bottom + tabBarClearance + 8);
+    // Bottom padding - modal overlays screen so no tab bar clearance needed
+    const bottomPadding = Math.max(24, insets.bottom + 8);
+
+    // Handle bounty toggle without dismissing keyboard
+    const handleBountyToggle = (value: boolean) => {
+        setHasBounty(value);
+        // Keep keyboard open if it was already open
+        if (Keyboard.isVisible?.() || Platform.OS === 'ios') {
+            // Small delay to let the switch animation complete, then refocus
+            setTimeout(() => {
+                nameInputRef.current?.focus();
+            }, 50);
+        }
+    };
+
+    // Handle category selection without dismissing keyboard
+    const handleCategorySelect = (cat: string) => {
+        setCategory(cat === category ? null : cat);
+        // Keep keyboard open
+        if (Keyboard.isVisible?.() || Platform.OS === 'ios') {
+            setTimeout(() => {
+                nameInputRef.current?.focus();
+            }, 50);
+        }
+    };
+
+    // Validate bounty input: only allow numbers and up to 2 decimal places
+    const handleBountyChange = (text: string) => {
+        // Allow empty string to clear
+        if (text === '') {
+            setBountyAmount('');
+            return;
+        }
+
+        // Regex for positive decimal with up to 2 places
+        // Allows: "1", "1.", "1.2", "1.23", ".5", ".56"
+        if (/^\d*\.?\d{0,2}$/.test(text)) {
+            setBountyAmount(text);
+        }
+    };
 
     const handleAdd = async () => {
         if (!name.trim()) return;
 
-        const bounty = hasBounty && bountyAmount ? parseFloat(bountyAmount) : null;
+        let bounty: number | null = null;
+        if (hasBounty && bountyAmount) {
+            const parsed = parseFloat(bountyAmount);
+            if (!isNaN(parsed) && parsed > 0) {
+                bounty = parsed;
+            }
+        }
         await onAdd(name.trim(), category, bounty);
 
         // Reset form
@@ -88,6 +132,7 @@ export function AddItemModal({ visible, onClose, onAdd, isLoading }: AddItemModa
 
                     <Text style={{ marginBottom: 8, fontSize: 14, fontWeight: '600', color: isDark ? '#fff' : '#000' }}>Item Name</Text>
                     <TextInput
+                        ref={nameInputRef}
                         style={{
                             marginBottom: 20,
                             borderRadius: 16,
@@ -115,7 +160,7 @@ export function AddItemModal({ visible, onClose, onAdd, isLoading }: AddItemModa
                         {CATEGORIES.map((cat) => (
                             <Pressable
                                 key={cat}
-                                onPress={() => setCategory(cat === category ? null : cat)}
+                                onPress={() => handleCategorySelect(cat)}
                                 style={{
                                     borderRadius: 9999,
                                     borderWidth: 1,
@@ -150,7 +195,7 @@ export function AddItemModal({ visible, onClose, onAdd, isLoading }: AddItemModa
                         </View>
                         <Switch
                             value={hasBounty}
-                            onValueChange={setHasBounty}
+                            onValueChange={handleBountyToggle}
                             trackColor={{ false: '#e5e7eb', true: '#059669' }}
                             thumbColor="#fff"
                             ios_backgroundColor="#e5e7eb"
@@ -174,7 +219,7 @@ export function AddItemModal({ visible, onClose, onAdd, isLoading }: AddItemModa
                             placeholderTextColor="#999"
                             keyboardType="decimal-pad"
                             value={bountyAmount}
-                            onChangeText={setBountyAmount}
+                            onChangeText={handleBountyChange}
                         />
                     )}
 
