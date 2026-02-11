@@ -3,7 +3,6 @@ import { X } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import { useRef, useState } from 'react';
 import {
-    Keyboard,
     KeyboardAvoidingView,
     Platform,
     Pressable,
@@ -11,6 +10,7 @@ import {
     Switch,
     Text,
     TextInput,
+    TouchableOpacity,
     View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,29 +44,6 @@ export function AddItemModal({ visible, onClose, onAdd, isLoading }: AddItemModa
 
     // Bottom padding - modal overlays screen so no tab bar clearance needed
     const bottomPadding = Math.max(24, insets.bottom + 8);
-
-    // Handle bounty toggle without dismissing keyboard
-    const handleBountyToggle = (value: boolean) => {
-        setHasBounty(value);
-        // Keep keyboard open if it was already open
-        if (Keyboard.isVisible?.() || Platform.OS === 'ios') {
-            // Small delay to let the switch animation complete, then refocus
-            setTimeout(() => {
-                nameInputRef.current?.focus();
-            }, 50);
-        }
-    };
-
-    // Handle category selection without dismissing keyboard
-    const handleCategorySelect = (cat: string) => {
-        setCategory(cat === category ? null : cat);
-        // Keep keyboard open
-        if (Keyboard.isVisible?.() || Platform.OS === 'ios') {
-            setTimeout(() => {
-                nameInputRef.current?.focus();
-            }, 50);
-        }
-    };
 
     // Validate bounty input: only allow numbers and up to 2 decimal places
     const handleBountyChange = (text: string) => {
@@ -113,6 +90,12 @@ export function AddItemModal({ visible, onClose, onAdd, isLoading }: AddItemModa
                 <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onPress={onClose} />
 
                 <View
+                    onStartShouldSetResponder={() => true}
+                    onResponderRelease={(e) => {
+                        // Prevent keyboard dismissal when tapping inside the modal sheet
+                        // (but not on TextInputs, which handle their own focus)
+                        e.preventDefault();
+                    }}
                     style={{
                         borderTopLeftRadius: 24,
                         borderTopRightRadius: 24,
@@ -156,11 +139,13 @@ export function AddItemModal({ visible, onClose, onAdd, isLoading }: AddItemModa
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={{ gap: 8, marginBottom: 20 }}
+                        keyboardShouldPersistTaps="always"
                     >
                         {CATEGORIES.map((cat) => (
-                            <Pressable
+                            <TouchableOpacity
                                 key={cat}
-                                onPress={() => handleCategorySelect(cat)}
+                                activeOpacity={0.7}
+                                onPress={() => setCategory(cat === category ? null : cat)}
                                 style={{
                                     borderRadius: 9999,
                                     borderWidth: 1,
@@ -184,7 +169,7 @@ export function AddItemModal({ visible, onClose, onAdd, isLoading }: AddItemModa
                                 >
                                     {cat}
                                 </Text>
-                            </Pressable>
+                            </TouchableOpacity>
                         ))}
                     </ScrollView>
 
@@ -195,7 +180,7 @@ export function AddItemModal({ visible, onClose, onAdd, isLoading }: AddItemModa
                         </View>
                         <Switch
                             value={hasBounty}
-                            onValueChange={handleBountyToggle}
+                            onValueChange={setHasBounty}
                             trackColor={{ false: '#e5e7eb', true: '#059669' }}
                             thumbColor="#fff"
                             ios_backgroundColor="#e5e7eb"
@@ -235,3 +220,4 @@ export function AddItemModal({ visible, onClose, onAdd, isLoading }: AddItemModa
         </View>
     );
 }
+
